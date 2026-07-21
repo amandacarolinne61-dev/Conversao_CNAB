@@ -5,12 +5,6 @@ async function lerArquivoComoLatin1(file) {
   return new TextDecoder('iso-8859-1').decode(buffer)
 }
 
-function formatarData(iso) {
-  if (!iso) return '—'
-  const [ano, mes, dia] = iso.split('-')
-  return `${dia}/${mes}/${ano}`
-}
-
 const STATUS_LABEL = {
   aguardando_retorno: { texto: 'Aguardando retorno', cor: '#8a8f98' },
   liquidado: { texto: 'Liquidado', cor: '#1a7f37' },
@@ -112,7 +106,7 @@ export default function Home() {
 
         <a className="card upload-card" href="/api/exportar-baixas" style={{ textDecoration: 'none' }}>
           <span className="card-titulo">Exportar baixas</span>
-          <span className="card-desc">CSV com os títulos liquidados, pronto pra importar no G3</span>
+          <span className="card-desc">Arquivo .RET com os títulos liquidados, pronto pra importar no G3</span>
         </a>
       </section>
 
@@ -128,6 +122,8 @@ export default function Home() {
               <th>Seu Número</th>
               <th>Sacado</th>
               <th>Valor</th>
+              <th>Valor Pago</th>
+              <th>Diferença</th>
               <th>Vencimento</th>
               <th>Status</th>
               <th>Última ocorrência</th>
@@ -139,12 +135,22 @@ export default function Home() {
               const ultimoMov = (t.movimentos_retorno || []).sort((a, b) =>
                 (b.data_ocorrencia || '').localeCompare(a.data_ocorrencia || '')
               )[0]
+              const valorTitulo = Number(t.valor_titulo || 0)
+              const valorPago = ultimoMov && ultimoMov.valor_pago != null ? Number(ultimoMov.valor_pago) : null
+              const diferenca = valorPago != null ? valorPago - valorTitulo : null
+              const temDiferenca = diferenca != null && Math.abs(diferenca) > 0.005
+              const formatarMoeda = (v) =>
+                v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
               return (
                 <tr key={t.id}>
                   <td>{t.nosso_numero}</td>
                   <td>{t.seu_numero}</td>
                   <td>{t.nome_sacado}</td>
-                  <td>{Number(t.valor_titulo || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                  <td>{formatarMoeda(valorTitulo)}</td>
+                  <td>{valorPago != null ? formatarMoeda(valorPago) : '—'}</td>
+                  <td style={temDiferenca ? { color: '#cf222e', fontWeight: 'bold' } : undefined}>
+                    {diferenca != null ? formatarMoeda(diferenca) : '—'}
+                  </td>
                   <td>{formatarData(t.data_vencimento)}</td>
                   <td>
                     <span className="status-pill" style={{ background: status.cor }}>
@@ -157,7 +163,7 @@ export default function Home() {
             })}
             {titulos.length === 0 && (
               <tr>
-                <td colSpan={7} className="vazio">
+                <td colSpan={9} className="vazio">
                   Nenhum título ainda. Envie uma remessa pra começar.
                 </td>
               </tr>
