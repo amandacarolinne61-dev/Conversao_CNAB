@@ -5,6 +5,15 @@ async function lerArquivoComoLatin1(file) {
   return new TextDecoder('iso-8859-1').decode(buffer)
 }
 
+// Formata a data sem passar pelo objeto Date (evita bug de "1 dia a menos"
+// causado pelo fuso horário: new Date("2026-02-22") vira meia-noite UTC,
+// que no fuso do Brasil "volta" um dia).
+function formatarData(iso) {
+  if (!iso) return '—'
+  const [ano, mes, dia] = iso.split('-')
+  return `${dia}/${mes}/${ano}`
+}
+
 const STATUS_LABEL = {
   aguardando_retorno: { texto: 'Aguardando retorno', cor: '#8a8f98' },
   liquidado: { texto: 'Liquidado', cor: '#1a7f37' },
