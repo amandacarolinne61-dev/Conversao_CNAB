@@ -70,9 +70,20 @@ function valorParaCNAB(valor, tamanho = 13) {
   return pad(centavos, tamanho)
 }
 
-// Referência do título (campo "eco", 8 posições, ex "000728/G").
-// Usa o seu_numero salvo; se não couber no padrão num+"/"+letra, faz um
-// best-effort truncando/preenchendo - não afeta o casamento por nosso_numero.
+// Referência do título na posição 42-52 (10 posições) - CONFIRMADO que é
+// essa a posição que o G3 lê como "Título" (mesma posição usada na própria
+// remessa, ex "202600116A"). O campo na posição 116 é só um eco interno que
+// o G3 NÃO usa - descoberto comparando o .RET gerado com a saída real do
+// G3 ("Lista do Processamento"), que mostrava o MESMO título repetido pra
+// todos os registros porque só a posição 116 estava sendo atualizada.
+function tituloParaPosicao42(seuNumero) {
+  const s = String(seuNumero || '').trim().toUpperCase()
+  if (s.length >= 10) return s.slice(0, 10)
+  return '0'.repeat(10 - s.length) + s
+}
+
+// Referência "eco" na posição 116 (8 posições, ex "000728/G") - mantida por
+// consistência/histórico, mas o G3 não usa esse campo para identificar o título.
 function referenciaTitulo(seuNumero) {
   const s = String(seuNumero || '').trim()
   if (s.length <= 8) return padDireita(s, 8)
@@ -126,6 +137,7 @@ export default async function handler(req, res) {
       const mov = movimentosBaixa[0]
 
       let linha = DETAIL_TEMPLATE
+      linha = setAt(linha, 42, tituloParaPosicao42(t.seu_numero)) // <-- campo real lido pelo G3
       linha = setAt(linha, 62, pad(t.nosso_numero, 8))
       linha = setAt(linha, 108, '06')
       linha = setAt(linha, 116, referenciaTitulo(t.seu_numero))
