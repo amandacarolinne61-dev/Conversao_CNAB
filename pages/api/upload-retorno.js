@@ -5,13 +5,11 @@ export const config = {
   api: { bodyParser: { sizeLimit: '5mb' } },
 }
 
-// mapa de status por código de ocorrência (espelha ocorrencias_ref)
 const STATUS_POR_OCORRENCIA = {
   '02': 'confirmado',
   '03': 'rejeitado',
   '06': 'liquidado',
   '09': 'baixado',
-  15: 'baixa_rejeitada',
   '15': 'baixa_rejeitada',
 }
 
@@ -30,6 +28,40 @@ export default async function handler(req, res) {
 
     if (movimentos.length === 0) {
       return res.status(400).json({ error: 'Nenhum movimento encontrado no arquivo' })
+    }
+
+    // --- Duplicidade: mesmo Nosso Número + mesma ocorrência + mesma data já existe? ---
+    const nossosNumeros = [...new Set(movimentos.map((m) => m.nossoNumero).filter(Boolean))]
+
+    const { data: movimentosExistentes, error: erroChecagem } = await supabase
+      .from('movimentos_retorno')
+      .select('nosso_numero, ocorrencia_codigo, data_ocorrencia, ocorrencia_descricao')
+      .in('nosso_numero', nossosNumeros)
+
+    if (erroChecagem) throw erroChecagem
+
+    const chaveExistente = new Set(
+      (movimentosExistentes || []).map(
+        (m) => `${m.nosso_numero}|${m.ocorrencia_codigo}|${m.data_ocorrencia}`
+      )
+    )
+
+    const duplicados = movimentos.filter((m) =>
+      chaveExistente.has(`${m.nossoNumero}|${m.ocorrenciaCodigo}|${m.dataOcorrencia}`)
+    )
+
+    if (duplicados.length > 0) {
+      const lista = duplicados
+        .slice(0, 10)
+        .map((m) => `${m.nossoNumero} (ocorrência ${m.ocorrenciaCodigo} em ${m.dataOcorrencia})`)
+        .join('; ')
+
+      return res.status(409).json({
+        error: `⚠️ ${duplicados.length} movimento(s) já foram processados antes e não foram gravados de novo: ${lista}${
+          duplicados.length > 10 ? '...' : ''
+        }`,
+        tipo: 'movimentos_duplicados',
+      })
     }
 
     const { data: ocorrenciasRef } = await supabase.from('ocorrencias_ref').select('*')
