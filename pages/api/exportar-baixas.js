@@ -161,7 +161,20 @@ export default async function handler(req, res) {
     }
 
     // --- Trailer ---
-    let trailer = setAt(TRAILER_TEMPLATE, 394, pad(seq, 6))
+    // Preenche quantidade de títulos e valor total, em vez de deixar
+    // zerado - descoberto comparando com um arquivo que funcionou de
+    // verdade no G3: a posição 177-184 (quantidade) batia exatamente com
+    // o número de títulos do arquivo. Deixar isso zerado pode ser o motivo
+    // do G3 não "confiar" no arquivo pra lançar os valores.
+    const quantidadeTitulos = titulos.length
+    const valorTotalCentavos = titulos.reduce(
+      (soma, t) => soma + Math.round(Number(t.valor_titulo || 0) * 100),
+      0
+    )
+    let trailer = TRAILER_TEMPLATE
+    trailer = setAt(trailer, 177, pad(quantidadeTitulos, 7))
+    trailer = setAt(trailer, 184, pad(valorTotalCentavos, 16))
+    trailer = setAt(trailer, 394, pad(seq, 6))
     linhas.push(trailer)
 
     const conteudo = linhas.join('\r\n') + '\r\n'
