@@ -5,6 +5,7 @@ export const config = {
   api: { bodyParser: { sizeLimit: '5mb' } },
 }
 
+// mapa de status por código de ocorrência (espelha ocorrencias_ref)
 const STATUS_POR_OCORRENCIA = {
   '02': 'confirmado',
   '03': 'rejeitado',
@@ -30,30 +31,31 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Nenhum movimento encontrado no arquivo' })
     }
 
-    // --- Duplicidade: mesmo Nosso Número + mesma ocorrência + mesma data já existe? ---
-    const nossosNumeros = [...new Set(movimentos.map((m) => m.nossoNumero).filter(Boolean))]
+    // --- Duplicidade: mesma referência de título + mesma ocorrência + mesma data já existe? ---
+    // (referenciaTitulo é a chave de casamento real - ver comentário em cnabRetorno.js)
+    const referencias = [...new Set(movimentos.map((m) => m.referenciaTitulo).filter(Boolean))]
 
     const { data: movimentosExistentes, error: erroChecagem } = await supabase
       .from('movimentos_retorno')
-      .select('nosso_numero, ocorrencia_codigo, data_ocorrencia, ocorrencia_descricao')
-      .in('nosso_numero', nossosNumeros)
+      .select('seu_numero_raw, ocorrencia_codigo, data_ocorrencia')
+      .in('seu_numero_raw', referencias)
 
     if (erroChecagem) throw erroChecagem
 
     const chaveExistente = new Set(
       (movimentosExistentes || []).map(
-        (m) => `${m.nosso_numero}|${m.ocorrencia_codigo}|${m.data_ocorrencia}`
+        (m) => `${m.seu_numero_raw}|${m.ocorrencia_codigo}|${m.data_ocorrencia}`
       )
     )
 
     const duplicados = movimentos.filter((m) =>
-      chaveExistente.has(`${m.nossoNumero}|${m.ocorrenciaCodigo}|${m.dataOcorrencia}`)
+      chaveExistente.has(`${m.referenciaTitulo}|${m.ocorrenciaCodigo}|${m.dataOcorrencia}`)
     )
 
     if (duplicados.length > 0) {
       const lista = duplicados
         .slice(0, 10)
-        .map((m) => `${m.nossoNumero} (ocorrência ${m.ocorrenciaCodigo} em ${m.dataOcorrencia})`)
+        .map((m) => `${m.referenciaTitulo} (ocorrência ${m.ocorrenciaCodigo} em ${m.dataOcorrencia})`)
         .join('; ')
 
       return res.status(409).json({
@@ -84,10 +86,12 @@ export default async function handler(req, res) {
     const resultado = []
 
     for (const mov of movimentos) {
+      // CASAMENTO: por seu_numero (referência do título), não por nosso_numero
+      // (que no retorno é um número interno da própria factoring).
       const { data: titulo } = await supabase
         .from('titulos')
         .select('*')
-        .eq('nosso_numero', mov.nossoNumero)
+        .eq('seu_numero', mov.referenciaTitulo)
         .order('criado_em', { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -98,14 +102,17 @@ export default async function handler(req, res) {
       const { error: erroMov } = await supabase.from('movimentos_retorno').insert({
         retorno_id: retorno.id,
         titulo_id: titulo ? titulo.id : null,
-        nosso_numero: mov.nossoNumero,
+        // guardamos o número da factoring aqui só como referência/debug
+        nosso_numero: mov.nossoNumeroFactoring,
         ocorrencia_codigo: mov.ocorrenciaCodigo,
         ocorrencia_descricao: ref ? ref.descricao : 'Código não mapeado',
         data_ocorrencia: mov.dataOcorrencia,
         valor_pago: mov.valorPago,
         data_credito: mov.dataCredito,
         sacado_nome: mov.sacadoNome,
-        seu_numero_raw: mov.seuNumeroRaw,
+        // seu_numero_raw agora guarda a referência do título já normalizada
+        // (chave de casamento real, ex "202600309F")
+        seu_numero_raw: mov.referenciaTitulo,
         gera_baixa: geraBaixa,
       })
       if (erroMov) throw erroMov
@@ -116,7 +123,8 @@ export default async function handler(req, res) {
       }
 
       resultado.push({
-        nossoNumero: mov.nossoNumero,
+        referenciaTitulo: mov.referenciaTitulo,
+        nossoNumeroFactoring: mov.nossoNumeroFactoring,
         encontrado: !!titulo,
         ocorrencia: mov.ocorrenciaCodigo,
         descricao: ref ? ref.descricao : 'Código não mapeado',
