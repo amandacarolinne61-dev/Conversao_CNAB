@@ -25,37 +25,36 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Conteúdo do arquivo não informado' })
     }
 
-    const { cabecalho, movimentos } = parseRetorno(conteudo)
+    const { cabecalho, movimentos, linhasIgnoradas } = parseRetorno(conteudo)
 
     if (movimentos.length === 0) {
       return res.status(400).json({ error: 'Nenhum movimento encontrado no arquivo' })
     }
 
-    // --- Duplicidade: mesma referência de título + mesma ocorrência + mesma data já existe? ---
-    // (referenciaTitulo é a chave de casamento real - ver comentário em cnabRetorno.js)
-    const referencias = [...new Set(movimentos.map((m) => m.referenciaTitulo).filter(Boolean))]
+    // --- Duplicidade: mesmo Nosso Número + mesma ocorrência + mesma data já existe? ---
+    const nossosNumeros = [...new Set(movimentos.map((m) => m.nossoNumeroFactoring).filter(Boolean))]
 
     const { data: movimentosExistentes, error: erroChecagem } = await supabase
       .from('movimentos_retorno')
-      .select('seu_numero_raw, ocorrencia_codigo, data_ocorrencia')
-      .in('seu_numero_raw', referencias)
+      .select('nosso_numero, ocorrencia_codigo, data_ocorrencia')
+      .in('nosso_numero', nossosNumeros)
 
     if (erroChecagem) throw erroChecagem
 
     const chaveExistente = new Set(
       (movimentosExistentes || []).map(
-        (m) => `${m.seu_numero_raw}|${m.ocorrencia_codigo}|${m.data_ocorrencia}`
+        (m) => `${m.nosso_numero}|${m.ocorrencia_codigo}|${m.data_ocorrencia}`
       )
     )
 
     const duplicados = movimentos.filter((m) =>
-      chaveExistente.has(`${m.referenciaTitulo}|${m.ocorrenciaCodigo}|${m.dataOcorrencia}`)
+      chaveExistente.has(`${m.nossoNumeroFactoring}|${m.ocorrenciaCodigo}|${m.dataOcorrencia}`)
     )
 
     if (duplicados.length > 0) {
       const lista = duplicados
         .slice(0, 10)
-        .map((m) => `${m.referenciaTitulo} (ocorrência ${m.ocorrenciaCodigo} em ${m.dataOcorrencia})`)
+        .map((m) => `${m.nossoNumeroFactoring} (ocorrência ${m.ocorrenciaCodigo} em ${m.dataOcorrencia})`)
         .join('; ')
 
       return res.status(409).json({
@@ -86,16 +85,15 @@ export default async function handler(req, res) {
     const resultado = []
 
     for (const mov of movimentos) {
-      // CASAMENTO: por seu_numero (referência do título), não por nosso_numero
-      // (que no retorno é um número interno da própria factoring).
-      // IMPORTANTE: usa ilike (case-insensitive) porque a factoring às vezes
-      // manda a letra da parcela em minúsculo (ex: "202600636/b"), enquanto o
-      // seu sistema grava em maiúsculo ("202600636B") - comparação exata
-      // (eq) perdia esses casos silenciosamente.
+      // CASAMENTO: por Nosso Número (confirmado confiável e único por
+      // título, tanto na remessa quanto no retorno). NÃO usar Seu Número
+      // aqui - foi confirmado que o mesmo Seu Número pode se repetir em
+      // vários títulos diferentes, o que atribuiria a liquidação ao título
+      // errado.
       const { data: titulo } = await supabase
         .from('titulos')
         .select('*')
-        .ilike('seu_numero', mov.referenciaTitulo)
+        .eq('nosso_numero', mov.nossoNumeroFactoring)
         .order('criado_em', { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -106,7 +104,6 @@ export default async function handler(req, res) {
       const { error: erroMov } = await supabase.from('movimentos_retorno').insert({
         retorno_id: retorno.id,
         titulo_id: titulo ? titulo.id : null,
-        // guardamos o número da factoring aqui só como referência/debug
         nosso_numero: mov.nossoNumeroFactoring,
         ocorrencia_codigo: mov.ocorrenciaCodigo,
         ocorrencia_descricao: ref ? ref.descricao : 'Código não mapeado',
@@ -114,9 +111,9 @@ export default async function handler(req, res) {
         valor_pago: mov.valorPago,
         data_credito: mov.dataCredito,
         sacado_nome: mov.sacadoNome,
-        // seu_numero_raw agora guarda a referência do título já normalizada
-        // (chave de casamento real, ex "202600309F")
-        seu_numero_raw: mov.referenciaTitulo,
+        // seu_numero_raw fica só como referência/informação, não é usado
+        // pra casar com o título
+        seu_numero_raw: mov.seuNumeroRaw,
         gera_baixa: geraBaixa,
       })
       if (erroMov) throw erroMov
@@ -127,8 +124,8 @@ export default async function handler(req, res) {
       }
 
       resultado.push({
-        referenciaTitulo: mov.referenciaTitulo,
-        nossoNumeroFactoring: mov.nossoNumeroFactoring,
+        nossoNumero: mov.nossoNumeroFactoring,
+        seuNumero: mov.seuNumeroRaw,
         encontrado: !!titulo,
         ocorrencia: mov.ocorrenciaCodigo,
         descricao: ref ? ref.descricao : 'Código não mapeado',
@@ -137,7 +134,12 @@ export default async function handler(req, res) {
       })
     }
 
-    return res.status(200).json({ ok: true, retornoId: retorno.id, resultado })
+    return res.status(200).json({
+      ok: true,
+      retornoId: retorno.id,
+      resultado,
+      linhasIgnoradas: linhasIgnoradas.length > 0 ? linhasIgnoradas : undefined,
+    })
   } catch (err) {
     console.error(err)
     return res.status(500).json({ error: err.message || 'Erro ao processar retorno' })
