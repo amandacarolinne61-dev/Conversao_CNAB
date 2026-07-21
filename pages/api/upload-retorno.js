@@ -88,10 +88,14 @@ export default async function handler(req, res) {
     for (const mov of movimentos) {
       // CASAMENTO: por seu_numero (referência do título), não por nosso_numero
       // (que no retorno é um número interno da própria factoring).
+      // IMPORTANTE: usa ilike (case-insensitive) porque a factoring às vezes
+      // manda a letra da parcela em minúsculo (ex: "202600636/b"), enquanto o
+      // seu sistema grava em maiúsculo ("202600636B") - comparação exata
+      // (eq) perdia esses casos silenciosamente.
       const { data: titulo } = await supabase
         .from('titulos')
         .select('*')
-        .eq('seu_numero', mov.referenciaTitulo)
+        .ilike('seu_numero', mov.referenciaTitulo)
         .order('criado_em', { ascending: false })
         .limit(1)
         .maybeSingle()
