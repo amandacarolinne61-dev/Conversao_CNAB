@@ -28,11 +28,15 @@ export const config = {
   api: { bodyParser: { sizeLimit: '5mb' } },
 }
 
+// Templates baseados em LINHAS REAIS do retorno da Bancorp (341RETCLI...RET,
+// já processado com sucesso antes) - não mais no exemplo antigo da ZPEL, que
+// deixava caracteres residuais de outro layout (ex: um "E" sobrando na
+// posição 107, onde o arquivo real tem espaço em branco).
 const HEADER_TEMPLATE =
-  '02RETORNO01COBRANCA       910100759455        ZPEL COMERCIAL LTDA           398BANCO ITAU SA  17072600000BPI00001170726                                                                                                                                                                                                                                                                                   000001'
+  '02RETORNO01COBRANCA       000000000000        ENERGY POWER LTDA             341BANCO ITAU SA  21072600000BPI00000210726                                                                                                                                                                                                                                                                                   000001'
 
 const DETAIL_TEMPLATE =
-  '10250484361000129910100759455        00154000000728GV         00000248            109000002481             E06170726000728/G  00000248            170726000000027600034100000010000000000250                          0000000000000000000000000000000000000000000000275750000000000000000000000000000  1707260000      0000000000000MONEY SOLUTION EMPRESARIAL LTD                                      AA000002'
+  '10260225985000185000000000000        6564707                  06564707            000065647070              0615062620260359/C06564707            150626000000178096000000000000000000000000                          000000000000000000000000000000000000000000000178096000000000000000000000000000   1606260000      0000000000000MB COMERCIO DE PELICULAS EIREL                                        000009'
 
 const TRAILER_TEMPLATE =
   '9                                                                                                                                                                                                                                                                                                                                                                                                         000007'
@@ -142,7 +146,11 @@ export default async function handler(req, res) {
       linha = setAt(linha, 108, '06')
       linha = setAt(linha, 116, referenciaTitulo(t.seu_numero))
       linha = setAt(linha, 146, isoParaDDMMAA(mov?.data_ocorrencia))
-      linha = setAt(linha, 152, valorParaCNAB(mov?.valor_pago ?? t.valor_titulo))
+      // Usa sempre o VALOR DO TÍTULO (contratado), não o valor pago no
+      // retorno - eventuais diferenças (juros, liquidação combinada, etc.)
+      // ficam só como alerta visual na tela, não vão pro arquivo do G3.
+      linha = setAt(linha, 152, valorParaCNAB(t.valor_titulo))
+      linha = setAt(linha, 253, valorParaCNAB(t.valor_titulo))
       linha = setAt(linha, 295, isoParaDDMMAA(mov?.data_credito || mov?.data_ocorrencia))
       linha = setAt(linha, 324, padDireita((t.nome_sacado || '').toUpperCase(), 70))
       linha = setAt(linha, 394, pad(seq, 6))
