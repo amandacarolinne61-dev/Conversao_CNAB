@@ -5,6 +5,12 @@ async function lerArquivoComoLatin1(file) {
   return new TextDecoder('iso-8859-1').decode(buffer)
 }
 
+function formatarData(iso) {
+  if (!iso) return '—'
+  const [ano, mes, dia] = iso.split('-')
+  return `${dia}/${mes}/${ano}`
+}
+
 const STATUS_LABEL = {
   aguardando_retorno: { texto: 'Aguardando retorno', cor: '#8a8f98' },
   liquidado: { texto: 'Liquidado', cor: '#1a7f37' },
@@ -139,7 +145,7 @@ export default function Home() {
                   <td>{t.seu_numero}</td>
                   <td>{t.nome_sacado}</td>
                   <td>{Number(t.valor_titulo || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                  <td>{t.data_vencimento ? new Date(t.data_vencimento).toLocaleDateString('pt-BR') : '—'}</td>
+                  <td>{formatarData(t.data_vencimento)}</td>
                   <td>
                     <span className="status-pill" style={{ background: status.cor }}>
                       {status.texto}
