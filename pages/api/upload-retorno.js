@@ -58,17 +58,28 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Nenhum movimento encontrado no arquivo' })
     }
 
-    // --- Busca TODOS os títulos de uma vez, já com o CNPJ do cedente da
-    // remessa correspondente (join via remessa_id) ---
+    // --- Busca títulos e remessas SEPARADAMENTE e junta em JS ---
+    // (evita depender do Supabase resolver automaticamente o relacionamento
+    // titulos.remessa_id -> remessas.id, que pode falhar silenciosamente
+    // dependendo de como a FK foi declarada, devolvendo cnpj_cedente vazio
+    // pra todo mundo e quebrando a chave composta sem erro nenhum na tela)
     const { data: todosTitulos, error: erroTitulos } = await supabase
       .from('titulos')
-      .select('id, nosso_numero, status, criado_em, remessas(cnpj_cedente)')
+      .select('id, remessa_id, nosso_numero, status, criado_em')
 
     if (erroTitulos) throw erroTitulos
 
+    const { data: todasRemessas, error: erroRemessas } = await supabase
+      .from('remessas')
+      .select('id, cnpj_cedente')
+
+    if (erroRemessas) throw erroRemessas
+
+    const cnpjPorRemessaId = new Map((todasRemessas || []).map((r) => [r.id, r.cnpj_cedente]))
+
     const indiceTitulos = new Map()
     for (const t of todosTitulos || []) {
-      const cnpjCedente = t.remessas?.cnpj_cedente
+      const cnpjCedente = cnpjPorRemessaId.get(t.remessa_id)
       const chave = chaveComposta(cnpjCedente, t.nosso_numero)
       const atual = indiceTitulos.get(chave)
       if (!atual || new Date(t.criado_em) > new Date(atual.criado_em)) {
@@ -77,17 +88,27 @@ export default async function handler(req, res) {
     }
 
     // --- Duplicidade: mesmo cedente + Nosso Número + mesma ocorrência + mesma data já existe? ---
+    // (mesma lógica: busca movimentos_retorno e retornos separadamente e
+    // junta em JS, em vez de depender do join automático do Supabase)
     const { data: movimentosExistentes, error: erroChecagem } = await supabase
       .from('movimentos_retorno')
-      .select('nosso_numero, ocorrencia_codigo, data_ocorrencia, retornos(cnpj_cedente)')
+      .select('retorno_id, nosso_numero, ocorrencia_codigo, data_ocorrencia')
 
     if (erroChecagem) throw erroChecagem
 
+    const { data: todosRetornos, error: erroRetornos } = await supabase
+      .from('retornos')
+      .select('id, cnpj_cedente')
+
+    if (erroRetornos) throw erroRetornos
+
+    const cnpjPorRetornoId = new Map((todosRetornos || []).map((r) => [r.id, r.cnpj_cedente]))
+
     const chaveExistente = new Set(
-      (movimentosExistentes || []).map(
-        (m) =>
-          `${chaveComposta(m.retornos?.cnpj_cedente, m.nosso_numero)}|${m.ocorrencia_codigo}|${m.data_ocorrencia}`
-      )
+      (movimentosExistentes || []).map((m) => {
+        const cnpjCedente = cnpjPorRetornoId.get(m.retorno_id)
+        return `${chaveComposta(cnpjCedente, m.nosso_numero)}|${m.ocorrencia_codigo}|${m.data_ocorrencia}`
+      })
     )
 
     const cnpjCedenteDesteArquivo = movimentos[0]?.cnpjCedente
