@@ -14,14 +14,31 @@ const STATUS_POR_OCORRENCIA = {
   '15': 'baixa_rejeitada',
 }
 
-// Normaliza o Nosso Número pra comparação: mantém só dígitos e remove
-// zeros à esquerda. Isso resolve o caso em que o retorno traz "00000305"
-// mas a tabela titulos guarda "305" (ou vice-versa) - sem isso, uma
-// comparação exata (eq) nunca bate mesmo sendo o mesmo título.
+// Normaliza o Nosso Número pra comparação: só dígitos, sem zero à esquerda.
 function normalizarNossoNumero(valor) {
   const digitos = String(valor || '').replace(/\D/g, '')
   const semZerosEsquerda = digitos.replace(/^0+/, '')
   return semZerosEsquerda || '0'
+}
+
+// Normaliza CNPJ pra comparação: só dígitos (tira ponto, barra, traço).
+function normalizarCnpj(valor) {
+  return String(valor || '').replace(/\D/g, '')
+}
+
+// CHAVE DE CASAMENTO REAL: CNPJ do cedente + Nosso Número.
+//
+// O schema de `titulos` tem `unique (remessa_id, nosso_numero)` - ou seja,
+// o Nosso Número só é garantido único DENTRO da mesma remessa/cliente.
+// Clientes diferentes (ex: GLEISIANE, FENTE FILM, ZPEL) podem ter títulos
+// com o MESMO Nosso Número em remessas separadas. Buscar só por Nosso
+// Número (sem saber de qual cliente) arrisca casar com o título errado.
+//
+// O CNPJ do cedente mora na tabela `remessas` (não em `titulos`), então
+// pra montar essa chave é preciso buscar `titulos` já unido com sua
+// respectiva `remessas.cnpj_cedente`.
+function chaveComposta(cnpjCedente, nossoNumero) {
+  return `${normalizarCnpj(cnpjCedente)}|${normalizarNossoNumero(nossoNumero)}`
 }
 
 export default async function handler(req, res) {
@@ -41,47 +58,43 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Nenhum movimento encontrado no arquivo' })
     }
 
-    // --- Busca TODOS os títulos de uma vez (1 consulta em vez de N) ---
-    // e monta um índice por Nosso Número normalizado, pra achar o título
-    // certo mesmo que o formato salvo (zero à esquerda, espaços) seja
-    // diferente do que vem no arquivo de retorno.
+    // --- Busca TODOS os títulos de uma vez, já com o CNPJ do cedente da
+    // remessa correspondente (join via remessa_id) ---
     const { data: todosTitulos, error: erroTitulos } = await supabase
       .from('titulos')
-      .select('id, nosso_numero, status, criado_em')
+      .select('id, nosso_numero, status, criado_em, remessas(cnpj_cedente)')
 
     if (erroTitulos) throw erroTitulos
 
     const indiceTitulos = new Map()
     for (const t of todosTitulos || []) {
-      const chave = normalizarNossoNumero(t.nosso_numero)
+      const cnpjCedente = t.remessas?.cnpj_cedente
+      const chave = chaveComposta(cnpjCedente, t.nosso_numero)
       const atual = indiceTitulos.get(chave)
-      // se houver mais de um título com o mesmo Nosso Número (não deveria,
-      // mas por segurança), fica o mais recente
       if (!atual || new Date(t.criado_em) > new Date(atual.criado_em)) {
         indiceTitulos.set(chave, t)
       }
     }
 
-    // --- Duplicidade: mesmo Nosso Número + mesma ocorrência + mesma data já existe? ---
-    const nossosNumerosNormalizados = [
-      ...new Set(movimentos.map((m) => normalizarNossoNumero(m.nossoNumeroFactoring))),
-    ]
-
+    // --- Duplicidade: mesmo cedente + Nosso Número + mesma ocorrência + mesma data já existe? ---
     const { data: movimentosExistentes, error: erroChecagem } = await supabase
       .from('movimentos_retorno')
-      .select('nosso_numero, ocorrencia_codigo, data_ocorrencia')
+      .select('nosso_numero, ocorrencia_codigo, data_ocorrencia, retornos(cnpj_cedente)')
 
     if (erroChecagem) throw erroChecagem
 
     const chaveExistente = new Set(
       (movimentosExistentes || []).map(
-        (m) => `${normalizarNossoNumero(m.nosso_numero)}|${m.ocorrencia_codigo}|${m.data_ocorrencia}`
+        (m) =>
+          `${chaveComposta(m.retornos?.cnpj_cedente, m.nosso_numero)}|${m.ocorrencia_codigo}|${m.data_ocorrencia}`
       )
     )
 
+    const cnpjCedenteDesteArquivo = movimentos[0]?.cnpjCedente
+
     const duplicados = movimentos.filter((m) =>
       chaveExistente.has(
-        `${normalizarNossoNumero(m.nossoNumeroFactoring)}|${m.ocorrenciaCodigo}|${m.dataOcorrencia}`
+        `${chaveComposta(cnpjCedenteDesteArquivo, m.nossoNumeroFactoring)}|${m.ocorrenciaCodigo}|${m.dataOcorrencia}`
       )
     )
 
@@ -107,7 +120,7 @@ export default async function handler(req, res) {
       .insert({
         portador_codigo: cabecalho.portadorCodigo,
         portador_nome: cabecalho.portadorNome,
-        cnpj_cedente: movimentos[0]?.cnpjCedente || null,
+        cnpj_cedente: cnpjCedenteDesteArquivo || null,
         data_geracao: cabecalho.dataGeracao,
         nome_arquivo: nomeArquivo || null,
       })
@@ -118,7 +131,7 @@ export default async function handler(req, res) {
 
     // --- Grava todos os movimentos de uma vez (1 insert em lote em vez de N) ---
     const linhasParaGravar = movimentos.map((mov) => {
-      const chave = normalizarNossoNumero(mov.nossoNumeroFactoring)
+      const chave = chaveComposta(mov.cnpjCedente, mov.nossoNumeroFactoring)
       const titulo = indiceTitulos.get(chave) || null
       const ref = refMap[mov.ocorrenciaCodigo]
       const geraBaixa = ref ? ref.gera_baixa : false
@@ -151,7 +164,6 @@ export default async function handler(req, res) {
     if (erroInsertLote) throw erroInsertLote
 
     // Atualiza o status de cada título que teve match, também em lote
-    // (agrupado por status novo, pra fazer 1 update por status em vez de 1 por título)
     const porStatus = new Map()
     for (const { titulo, mov } of linhasParaGravar) {
       if (!titulo) continue
