@@ -1,10 +1,32 @@
 import { supabase } from '../../lib/supabaseClient'
 
-// Templates copiados literalmente do arquivo simulado que você mandou
-// (CB170707_RETORNO_SIMULADO.RET) - mesma estrutura de 400 posições.
-// Só substituímos os campos variáveis (datas, valores, nome do sacado,
-// nosso número e número sequencial) nas posições já validadas no parser
-// lib/cnabRetorno.js.
+// Gerador do .RET de baixas, no MESMO layout confirmado do arquivo
+// CB170707_RETORNO_SIMULADO.RET (validado byte a byte contra o retorno real
+// da Bancorp em 341RETCLI...RET - as posições de nosso_numero, ocorrencia,
+// valor, datas e sacado são as MESMAS em ambos, o que confirma que esse é o
+// layout padrão de RETORNO usado pelo sistema/G3, independente da factoring
+// de origem).
+//
+// Posições confirmadas (linha de 400 posições fixas):
+//   62-70   nosso_numero (8 dígitos)
+//   108-110 código de ocorrência ("06" = liquidação)
+//   116-124 referência do título (ex "000728/G") - ECO informativo, não é
+//           chave de casamento, mas precisa ser atualizado por título
+//   146-152 data de ocorrência (DDMMAA)
+//   152-165 valor pago (13 dígitos, sem separador decimal)
+//   295-301 data de crédito (DDMMAA)
+//   324-394 nome do sacado (70 posições)
+//   394-400 número sequencial do registro (6 dígitos)
+//
+// Header:
+//   76-79   código do banco/portador
+//   94-100  data de geração (DDMMAA)
+//   108-113 sequencial do arquivo (5 dígitos)
+//   113-119 data de geração repetida (DDMMAA)
+
+export const config = {
+  api: { bodyParser: { sizeLimit: '5mb' } },
+}
 
 const HEADER_TEMPLATE =
   '02RETORNO01COBRANCA       910100759455        ZPEL COMERCIAL LTDA           398BANCO ITAU SA  17072600000BPI00001170726                                                                                                                                                                                                                                                                                   000001'
@@ -21,7 +43,7 @@ function setAt(str, start, valor) {
 
 function pad(valor, tamanho, char = '0') {
   const s = String(valor ?? '')
-  return s.length >= tamanho ? s.slice(0, tamanho) : char.repeat(tamanho - s.length) + s
+  return s.length >= tamanho ? s.slice(-tamanho) : char.repeat(tamanho - s.length) + s
 }
 
 function padDireita(valor, tamanho) {
@@ -31,7 +53,10 @@ function padDireita(valor, tamanho) {
 
 function hojeDDMMAA() {
   const d = new Date()
-  return `${pad(d.getDate(), 2)}${pad(d.getMonth() + 1, 2)}${String(d.getFullYear()).slice(2)}`
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const aa = String(d.getFullYear()).slice(2)
+  return `${dd}${mm}${aa}`
 }
 
 function isoParaDDMMAA(iso) {
@@ -43,6 +68,15 @@ function isoParaDDMMAA(iso) {
 function valorParaCNAB(valor, tamanho = 13) {
   const centavos = Math.round(Number(valor || 0) * 100)
   return pad(centavos, tamanho)
+}
+
+// Referência do título (campo "eco", 8 posições, ex "000728/G").
+// Usa o seu_numero salvo; se não couber no padrão num+"/"+letra, faz um
+// best-effort truncando/preenchendo - não afeta o casamento por nosso_numero.
+function referenciaTitulo(seuNumero) {
+  const s = String(seuNumero || '').trim()
+  if (s.length <= 8) return padDireita(s, 8)
+  return s.slice(0, 8)
 }
 
 export default async function handler(req, res) {
@@ -57,14 +91,18 @@ export default async function handler(req, res) {
 
     if (!titulos || titulos.length === 0) {
       res.setHeader('Content-Type', 'text/plain; charset=iso-8859-1')
-      return res.status(200).send('Nenhum titulo liquidado pendente de exportacao.')
+      return res.status(200).send('Nenhum titulo liquidado pendente de exportacao.\r\n')
     }
 
     const linhas = []
+    const dataHoje = hojeDDMMAA()
 
     // --- Header ---
-    let header = setAt(HEADER_TEMPLATE, 94, hojeDDMMAA())
-    header = setAt(header, 394, pad(1, 6))
+    let header = HEADER_TEMPLATE
+    header = setAt(header, 94, dataHoje) // data de geração
+    header = setAt(header, 108, pad(1, 5)) // sequencial do arquivo
+    header = setAt(header, 113, dataHoje) // data repetida
+    header = setAt(header, 394, pad(1, 6)) // sequencial do registro
     linhas.push(header)
 
     // --- Detalhes: 1 linha por título liquidado ---
@@ -72,13 +110,15 @@ export default async function handler(req, res) {
     const idsExportados = []
 
     for (const t of titulos) {
-      const mov = (t.movimentos_retorno || [])
+      const movimentosBaixa = (t.movimentos_retorno || [])
         .filter((m) => m.gera_baixa)
-        .sort((a, b) => (b.data_ocorrencia || '').localeCompare(a.data_ocorrencia || ''))[0]
+        .sort((a, b) => (b.data_ocorrencia || '').localeCompare(a.data_ocorrencia || ''))
+      const mov = movimentosBaixa[0]
 
       let linha = DETAIL_TEMPLATE
       linha = setAt(linha, 62, pad(t.nosso_numero, 8))
       linha = setAt(linha, 108, '06')
+      linha = setAt(linha, 116, referenciaTitulo(t.seu_numero))
       linha = setAt(linha, 146, isoParaDDMMAA(mov?.data_ocorrencia))
       linha = setAt(linha, 152, valorParaCNAB(mov?.valor_pago ?? t.valor_titulo))
       linha = setAt(linha, 295, isoParaDDMMAA(mov?.data_credito || mov?.data_ocorrencia))
@@ -96,13 +136,13 @@ export default async function handler(req, res) {
 
     const conteudo = linhas.join('\r\n') + '\r\n'
 
-    // Marca os títulos como exportados, pra não exportar de novo
+    // Marca os títulos como exportados, pra não exportar de novo na próxima vez
     await supabase
       .from('titulos')
       .update({ exportado_em: new Date().toISOString() })
       .in('id', idsExportados)
 
-    const nomeArquivo = `BAIXAS_${hojeDDMMAA()}.RET`
+    const nomeArquivo = `BAIXAS_${dataHoje}.RET`
 
     res.setHeader('Content-Type', 'text/plain; charset=iso-8859-1')
     res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`)
