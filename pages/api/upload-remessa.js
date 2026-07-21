@@ -22,11 +22,39 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Nenhum título de detalhe encontrado no arquivo' })
     }
 
+    // --- Duplicidade: algum Nosso Número desse arquivo já existe no sistema? ---
+    const nossosNumeros = titulos.map((t) => t.nossoNumero).filter(Boolean)
+
+    const { data: titulosExistentes, error: erroChecagem } = await supabase
+      .from('titulos')
+      .select('nosso_numero, seu_numero, nome_sacado')
+      .in('nosso_numero', nossosNumeros)
+
+    if (erroChecagem) throw erroChecagem
+
+    if (titulosExistentes && titulosExistentes.length > 0) {
+      const lista = titulosExistentes
+        .slice(0, 10)
+        .map((t) => `${t.nosso_numero} (${t.seu_numero || 's/ nº'} - ${t.nome_sacado || ''})`)
+        .join('; ')
+
+      return res.status(409).json({
+        error: `⚠️ ${titulosExistentes.length} título(s) já existem no sistema e não foram gravados de novo: ${lista}${
+          titulosExistentes.length > 10 ? '...' : ''
+        }`,
+        tipo: 'titulos_duplicados',
+        duplicados: titulosExistentes.map((t) => t.nosso_numero),
+      })
+    }
+
     const { data: remessa, error: erroRemessa } = await supabase
       .from('remessas')
       .insert({
         portador_codigo: portadorCodigo || cabecalho.portadorCodigo,
-        portador_nome: portadorNome || null,
+        // Nome do banco/portador do PRÓPRIO sistema (ex: "BANCO TESTE"),
+        // lido do cabeçalho da remessa - é esse código+nome que deve
+        // aparecer no .RET de saída, não o do retorno da factoring.
+        portador_nome: portadorNome || cabecalho.portadorNome || null,
         cnpj_cedente: titulos[0].cnpjCedente,
         nome_empresa: cabecalho.nomeEmpresa,
         codigo_transmissao: cabecalho.codigoTransmissao,
