@@ -83,7 +83,7 @@ export default async function handler(req, res) {
   try {
     const { data: titulos, error } = await supabase
       .from('titulos')
-      .select('*, movimentos_retorno(*)')
+      .select('*, movimentos_retorno(*), remessas(portador_codigo, portador_nome, nome_empresa)')
       .eq('status', 'liquidado')
       .is('exportado_em', null)
 
@@ -97,8 +97,18 @@ export default async function handler(req, res) {
     const linhas = []
     const dataHoje = hojeDDMMAA()
 
+    // Código/nome do banco e nome da empresa vêm da PRÓPRIA remessa (o
+    // código do SEU sistema, ex "777"/"BANCO TESTE") - nunca do retorno da
+    // factoring. Assume-se que todos os títulos exportados juntos são do
+    // mesmo portador; se um dia isso não for verdade, essa exportação
+    // precisará ser feita em lotes separados por portador.
+    const remessaRef = titulos[0].remessas || {}
+
     // --- Header ---
     let header = HEADER_TEMPLATE
+    header = setAt(header, 46, padDireita((remessaRef.nome_empresa || '').toUpperCase(), 30))
+    header = setAt(header, 76, pad(remessaRef.portador_codigo || '000', 3, '0'))
+    header = setAt(header, 79, padDireita((remessaRef.portador_nome || '').toUpperCase(), 15))
     header = setAt(header, 94, dataHoje) // data de geração
     header = setAt(header, 108, pad(1, 5)) // sequencial do arquivo
     header = setAt(header, 113, dataHoje) // data repetida
