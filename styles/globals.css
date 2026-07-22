@@ -154,3 +154,104 @@ td:first-child, td:nth-child(2) {
 @media (max-width: 720px) {
   .cards { grid-template-columns: 1fr; }
 }
+
+.dashboard {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dashboard-header h2 {
+  margin: 0;
+}
+
+.dashboard-selo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.dashboard-ponto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.dashboard-ponto.ao-vivo {
+  background: #1a7f37;
+  box-shadow: 0 0 0 3px #1a7f3722;
+}
+
+.dashboard-total {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 4px 0 18px;
+}
+
+.dashboard-barras {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dashboard-linha {
+  display: grid;
+  grid-template-columns: 130px 1fr 40px;
+  align-items: center;
+  gap: 12px;
+}
+
+.dashboard-rotulo {
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
+.dashboard-trilha {
+  position: relative;
+  height: 18px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: visible;
+}
+
+.dashboard-barra {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.dashboard-valor {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: right;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.dashboard-tooltip {
+  position: absolute;
+  top: -30px;
+  left: 0;
+  background: var(--ink);
+  color: white;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .dashboard-linha { grid-template-columns: 100px 1fr 32px; }
+}

@@ -6,10 +6,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Next.js (Pages Router) app that reconciles CNAB 400 banking files for a factoring
 workflow: upload a REMESSA (titles sent to the bank/portador), upload a RETORNO
-(bank's response file), match them by Nosso Número, and export a G3-ready RET
-file for titles that were liquidated (occurrence code `06`). Data is stored in
-Supabase (Postgres). All UI text, comments, and error messages are in
-Portuguese — match that when editing.
+(bank's response file), match them by Seu Número (see "Matching key" below),
+and export a G3-ready RET file for titles that were liquidated (occurrence
+code `06`). Data is stored in Supabase (Postgres). All UI text, comments, and
+error messages are in Portuguese — match that when editing.
+
+Built for a factoring operation (Energy Power / Money Solution), reconciling
+titles against multiple client "carteiras" (e.g. GLEISIANE, FENTE FILM,
+ZPEL). **Bancorp** is the first factoring/bank RETORNO layout this project
+targets and the one `cnabRetorno.js`'s shifting-middle-field handling was
+built around — see `lib/cnabRetorno.js` for that parsing note. `titulos`
+persist in Supabase from the moment a REMESSA is uploaded and stay there
+(never in-memory only) until a matching RETORNO arrives, however long that
+takes.
 
 ## Commands
 
@@ -24,10 +33,12 @@ There is no test suite and no lint script configured in `package.json`.
 
 Requires `.env.local` (see `.env.local.example`) with `SUPABASE_URL` and
 `SUPABASE_SERVICE_ROLE_KEY` — the service role key (not anon), because all
-writes happen server-side via `lib/supabaseClient.js`. Schema lives in
-`schema.sql`; run it manually in the Supabase SQL Editor before using the app
-(tables: `remessas`, `titulos`, `retornos`, `movimentos_retorno`,
-`ocorrencias_ref`).
+writes happen server-side via `lib/supabaseClient.js`. Also needs
+`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the public anon
+key) for the browser-side realtime dashboard — see "Realtime dashboard"
+below. Schema lives in `schema.sql`; run it manually in the Supabase SQL
+Editor before using the app (tables: `remessas`, `titulos`, `retornos`,
+`movimentos_retorno`, `ocorrencias_ref`, `dashboard_stats`).
 
 ## Architecture
 
@@ -52,24 +63,36 @@ fixed-width CNAB lines and write to Supabase.
   `titulos` where `status = 'liquidado' AND exportado_em IS NULL`, then marks
   them exported.
 - `pages/api/titulos.js` — read-only listing for the UI.
+- `pages/api/dashboard-status.js` — read-only counts per `titulos.status`,
+  backing the dashboard chart's initial load.
 
-### Matching key: composite CNPJ + Nosso Número, not Nosso Número alone
+### Matching key: Seu Número (document number), not Nosso Número
 
-`titulos` only enforces `unique (remessa_id, nosso_numero)` — Nosso Número is
-**not globally unique**, only unique within one remessa/client. Different
-clients (e.g. GLEISIANE, FENTE FILM, ZPEL) can share the same Nosso Número in
-separate remessas. `upload-retorno.js` therefore builds a composite key
-`cnpj_cedente|nosso_numero` (see `chaveComposta()`) by fetching `titulos` and
-`remessas` **separately and joining in JS** — deliberately avoiding Supabase's
-automatic FK-based join, which can silently return an empty `cnpj_cedente` and
-break the composite key with no visible error. Do the same separate-fetch+JS-join
-pattern if you touch this matching logic; don't "simplify" it into a Supabase
-nested select.
+As of the CNAB parsing update on 2026-07-22, the matching key between
+`titulos` and incoming `movimentos_retorno` is **Seu Número**
+(`titulos.seu_numero` / `mov.seuNumeroRaw`), normalized via
+`normalizarNumeroTitulo()` in `upload-retorno.js` (strips everything but
+letters/digits, case-insensitive). Nosso Número is **not** used to find the
+title anymore — it's extracted and stored purely as a reference field
+(`nossoNumeroFactoring`), used later by `exportar-baixas.js`.
 
-"Seu Número" (the document number field) is **never** used as a matching key —
-the same value can legitimately repeat across different titles/sacados in some
-files. It's carried through purely as an informational field
-(`referenciaTitulo` / `seuNumeroRaw` / `seu_numero_raw`).
+Why the change: `titulos` only enforces `unique (remessa_id, nosso_numero)` —
+Nosso Número is **not globally unique**, only unique within one
+remessa/client, so two different clients could collide on it and get matched
+to the wrong title. Seu Número is chosen by the client before the remessa is
+generated, so it's a stronger identity signal per client — **but it has also
+been seen to repeat across different titles/sacados within the same client**
+(one real case: FENTE FILM had the same Seu Número on 9 different titles). So
+`upload-retorno.js` never auto-picks among multiple candidates when a Seu
+Número hits more than one `titulo` — it collects every match, flags them as
+`titulosAmbiguos`, links none of them to `titulo_id`, and surfaces the list in
+the API response for manual resolution instead of silently matching wrong.
+
+If you touch this logic: keep building the lookup index from a **fresh
+separate fetch** of all `titulos` (see `indiceTitulos` in
+`upload-retorno.js`), not a Supabase nested/joined select — this codebase has
+previously relied on separate-fetch-and-join-in-JS to avoid silent join
+failures, and that habit still matters here even though the join key changed.
 
 ### Occurrence codes drive status, not hardcoded logic
 
@@ -93,6 +116,28 @@ the retorno — any discrepancy is surfaced only as a UI warning, never written
 to the exported file. Trailer must carry the real title count and total value
 (a zeroed trailer was observed to make G3 distrust the whole file).
 
+### Realtime dashboard (`dashboard_stats`)
+
+`schema.sql` defines a `dashboard_stats` table (status → count, one row per
+status) kept in sync with `titulos` by a Postgres trigger
+(`recalcular_dashboard_stats()`), rather than exposing `titulos` itself to
+Supabase Realtime. This is deliberate: `titulos` has CNPJ, sacado names and
+values — sensitive for a factoring operation — and Realtime payloads over
+`postgres_changes` go out to whatever holds the anon key, which is meant to
+be public. `dashboard_stats` never holds anything beyond status + count, so
+it's the only table with an RLS policy allowing public (`anon`) `select`; all
+other tables have RLS **enabled with no policy**, meaning only the server's
+`service_role` key (which bypasses RLS) can read/write them. If you add
+another Realtime-driven feature, follow the same pattern — never grant `anon`
+direct access to a business table just to get Realtime to fire.
+
+`components/DashboardChart.js` (browser) subscribes to `dashboard_stats` via
+`lib/supabaseBrowserClient.js`, which uses `NEXT_PUBLIC_SUPABASE_URL` /
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` (separate from the server's
+`SUPABASE_SERVICE_ROLE_KEY` — the anon key is the only one ever sent to the
+browser). If those env vars aren't set, the component falls back to polling
+`/api/dashboard-status` every 8s instead of failing.
+
 ### Dates
 
 CNAB dates are `DDMMAA` fixed-width, converted to ISO `YYYY-MM-DD` via
@@ -106,4 +151,7 @@ shifts a day earlier once converted to Brazil's timezone.
 ## Git workflow
 
 Sempre que terminar uma tarefa (fix, feature, refactor, etc.), faça commit e
-push automaticamente, sem esperar o usuário pedir explicitamente.
+push automaticamente, sem esperar o usuário pedir explicitamente — mas
+**sempre na branch `dev`, nunca direto em `main`** (main é produção). Se a
+branch `dev` não existir ainda localmente, crie a partir de `main`. Deploys
+pra `main` são decisão explícita do usuário, não automática.

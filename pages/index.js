@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import DashboardChart from '../components/DashboardChart'
 
 async function lerArquivoComoLatin1(file) {
   const buffer = await file.arrayBuffer()
@@ -128,6 +129,8 @@ export default function Home() {
 
       {mensagem && <div className={`mensagem ${mensagem.tipo}`}>{mensagem.texto}</div>}
       {carregando && <div className="mensagem">Processando...</div>}
+
+      <DashboardChart />
 
       <section>
         <h2>Títulos</h2>

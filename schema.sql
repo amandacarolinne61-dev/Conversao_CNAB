@@ -80,3 +80,70 @@ on conflict (codigo) do nothing;
 create index if not exists idx_titulos_nosso_numero on titulos (nosso_numero);
 create index if not exists idx_titulos_status on titulos (status);
 create index if not exists idx_movimentos_titulo on movimentos_retorno (titulo_id);
+
+-- Dashboard em tempo real
+--
+-- Tabela agregada (1 linha por status, só contagem) em vez de expor `titulos`
+-- via Realtime pro navegador: `titulos` tem CNPJ, nome do sacado e valores —
+-- dado sensível de uma operação de factoring. `dashboard_stats` nunca guarda
+-- nada além de status + contagem, então pode ser lida com a chave anon
+-- (pública) sem vazar nada. Ela é recalculada por trigger sempre que
+-- `titulos` muda, e o Supabase Realtime notifica o navegador quando ela muda.
+create table if not exists dashboard_stats (
+  status text primary key,
+  quantidade integer not null default 0,
+  atualizado_em timestamptz default now()
+);
+
+create or replace function recalcular_dashboard_stats() returns trigger as $$
+begin
+  delete from dashboard_stats;
+  insert into dashboard_stats (status, quantidade, atualizado_em)
+  select status, count(*), now() from titulos group by status;
+  return null;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists trg_recalcular_dashboard_stats on titulos;
+create trigger trg_recalcular_dashboard_stats
+  after insert or delete or update of status on titulos
+  for each statement
+  execute function recalcular_dashboard_stats();
+
+-- popula/atualiza a contagem inicial (idempotente, seguro rodar de novo)
+insert into dashboard_stats (status, quantidade, atualizado_em)
+select status, count(*), now() from titulos group by status
+on conflict (status) do update set quantidade = excluded.quantidade, atualizado_em = excluded.atualizado_em;
+
+-- RLS: habilitado em tudo. As tabelas com dado do negócio (remessas, titulos,
+-- retornos, movimentos_retorno, ocorrencias_ref) não ganham nenhuma policy de
+-- leitura pública de propósito — RLS habilitado sem policy = acesso negado
+-- pra qualquer role, exceto service_role (que ignora RLS e é o único usado
+-- pelo servidor, via SUPABASE_SERVICE_ROLE_KEY). Só dashboard_stats, que não
+-- tem dado sensível, ganha policy de leitura pública pro Realtime funcionar
+-- no navegador com a chave anon.
+alter table remessas enable row level security;
+alter table titulos enable row level security;
+alter table retornos enable row level security;
+alter table movimentos_retorno enable row level security;
+alter table ocorrencias_ref enable row level security;
+alter table dashboard_stats enable row level security;
+
+drop policy if exists "dashboard_stats: leitura publica" on dashboard_stats;
+create policy "dashboard_stats: leitura publica"
+  on dashboard_stats for select
+  to anon, authenticated
+  using (true);
+
+-- Adiciona dashboard_stats à publicação do Realtime (idempotente - só roda
+-- se ainda não tiver sido adicionada, senão o ALTER PUBLICATION dá erro de
+-- "relation already member" ao rodar o schema de novo).
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'dashboard_stats'
+  ) then
+    alter publication supabase_realtime add table dashboard_stats;
+  end if;
+end $$;
