@@ -97,7 +97,12 @@ create table if not exists dashboard_stats (
 
 create or replace function recalcular_dashboard_stats() returns trigger as $$
 begin
-  delete from dashboard_stats;
+  -- "where true" não é decoração: o Supabase bloqueia DELETE/UPDATE sem
+  -- WHERE para roles não-superuser (inclusive service_role, usada pelo
+  -- servidor) mesmo dentro de uma trigger SECURITY DEFINER - sem isso, todo
+  -- upload de remessa/retorno quebra com "DELETE requires a WHERE clause"
+  -- assim que a trigger dispara.
+  delete from dashboard_stats where true;
   insert into dashboard_stats (status, quantidade, atualizado_em)
   select status, count(*), now() from titulos group by status;
   return null;

@@ -131,6 +131,14 @@ other tables have RLS **enabled with no policy**, meaning only the server's
 another Realtime-driven feature, follow the same pattern — never grant `anon`
 direct access to a business table just to get Realtime to fire.
 
+Gotcha: this Supabase project rejects any `DELETE`/`UPDATE` without a `WHERE`
+clause for non-superuser roles — **including `service_role`, and even inside
+a `SECURITY DEFINER` trigger function**. The SQL Editor runs as `postgres`
+(exempt), so an unfiltered `delete from dashboard_stats;` looks fine there but
+throws `"DELETE requires a WHERE clause"` the moment a real upload (which
+runs as `service_role` through PostgREST) fires the trigger. Always write
+`where true` explicitly if a delete is meant to clear a whole table.
+
 `components/DashboardChart.js` (browser) subscribes to `dashboard_stats` via
 `lib/supabaseBrowserClient.js`, which uses `NEXT_PUBLIC_SUPABASE_URL` /
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` (separate from the server's
