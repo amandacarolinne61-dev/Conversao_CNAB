@@ -70,6 +70,8 @@ export default async function handler(req, res) {
       nosso_numero: t.nossoNumero,
       seu_numero: t.seuNumero,
       titulo_g3: t.tituloG3,
+      documento_cobranca: t.documentoCobranca,
+      numero_titulo: t.numeroTitulo,
       carteira: t.carteira,
       cnpj_sacado: t.cnpjSacado,
       nome_sacado: t.nomeSacado,

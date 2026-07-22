@@ -52,6 +52,22 @@ import { supabase } from '../../lib/supabaseClient'
 // pelo usuário: só a posição 116 importa pro G3. Voltamos a NÃO escrever
 // nada na posição 42 - fica como o DETAIL_TEMPLATE já traz.
 //
+// ACHADO (22/07/2026): a posição 38-62 (25 posições, "Nº do documento de
+// cobrança" no layout oficial) também ficava congelada com lixo do título
+// de exemplo ("...6564707..."). É um campo real da própria remessa
+// (extraído em cnabRemessa.js como `documentoCobranca`, gravado em
+// `titulos.documento_cobranca`) - confirmado pelo mesmo estilo em
+// CN20076A.RET ("00767000004883AV"). Ecoado verbatim no export agora.
+//
+// CORREÇÃO (22/07/2026): dentro dessas 25 posições, a "Número do Título"
+// (38-44, 7 dígitos) é o único trecho que realmente varia por título nos
+// dados reais - o resto do campo fica em branco. Esse subcampo estava
+// saindo com valor fixo/congelado em todas as linhas sempre que
+// `documento_cobranca` vinha vazio/incompleto pro título. Agora é gravado
+// à parte na remessa (`titulos.numero_titulo`) e escrito explicitamente
+// na exportação, igual pro mesmo título em todas as parcelas (A/B/C/D) e
+// diferente entre títulos diferentes.
+//
 // Header:
 //   76-79   código do banco/portador
 //   94-100  data de geração (DDMMAA)
@@ -165,6 +181,22 @@ export default async function handler(req, res) {
       const mov = movimentosBaixa[0]
 
       let linha = DETAIL_TEMPLATE
+      // Nº do documento de cobrança (posição 38-62, 25 posições) - ecoa
+      // verbatim o mesmo campo da remessa (titulos.documento_cobranca).
+      // Antes ficava congelado com o valor do título de exemplo
+      // ("...6564707..."); só pula a escrita se o título for de antes
+      // dessa coluna existir (deixa o lixo antigo do template nesse caso).
+      if (t.documento_cobranca) {
+        linha = setAt(linha, 37, padDireita(t.documento_cobranca.toUpperCase(), 25))
+      }
+      // Número do título (posição 38-44, 7 dígitos) - sobrescreve por cima
+      // do campo acima pra garantir que essas 7 posições especificamente
+      // fiquem certas (mesmo valor pra todas as parcelas do título, vindo
+      // da própria remessa via nosso_numero), em vez de depender do
+      // documento_cobranca completo vir sempre preenchido corretamente.
+      if (t.numero_titulo) {
+        linha = setAt(linha, 37, pad(t.numero_titulo, 7))
+      }
       linha = setAt(linha, 62, pad(t.nosso_numero, 8))
       linha = setAt(linha, 108, '06')
       linha = setAt(linha, 110, isoParaDDMMAA(mov?.data_ocorrencia)) // antes ficava congelado

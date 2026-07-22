@@ -21,6 +21,8 @@ create table if not exists titulos (
   nosso_numero text not null,
   seu_numero text,
   titulo_g3 text,
+  documento_cobranca text,
+  numero_titulo text,
   carteira text,
   cnpj_sacado text,
   nome_sacado text,
