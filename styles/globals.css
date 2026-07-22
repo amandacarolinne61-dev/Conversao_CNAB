@@ -91,6 +91,11 @@ header h1 {
   color: #cf222e;
 }
 
+.mensagem.aviso {
+  background: #fff8e6;
+  color: #9a6700;
+}
+
 h2 {
   font-size: 1.1rem;
   font-weight: 600;

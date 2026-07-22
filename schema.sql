@@ -20,6 +20,7 @@ create table if not exists titulos (
   remessa_id uuid references remessas(id) on delete cascade,
   nosso_numero text not null,
   seu_numero text,
+  titulo_g3 text,
   carteira text,
   cnpj_sacado text,
   nome_sacado text,

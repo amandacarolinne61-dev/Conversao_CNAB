@@ -8,15 +8,41 @@ import { supabase } from '../../lib/supabaseClient'
 // de origem).
 //
 // Posições confirmadas (linha de 400 posições fixas):
+//   42-52   título (10 dígitos) - CONFIRMADO campo real lido pelo G3
 //   62-70   nosso_numero (8 dígitos)
 //   108-110 código de ocorrência ("06" = liquidação)
-//   116-124 referência do título (ex "000728/G") - ECO informativo, não é
-//           chave de casamento, mas precisa ser atualizado por título
-//   146-152 data de ocorrência (DDMMAA)
+//   111-117 data de ocorrência (DDMMAA)
+//   117-127 nº do documento de cobrança (10 posições) - mesmo valor do
+//           título (posição 42), repetido aqui por layout
+//   127-135 confirmação do nosso número (8 dígitos) - mesmo valor da
+//           posição 62
+//   146-152 data de ocorrência (DDMMAA) [duplicado no layout de retorno]
 //   152-165 valor pago (13 dígitos, sem separador decimal)
 //   295-301 data de crédito (DDMMAA)
 //   324-394 nome do sacado (70 posições)
 //   394-400 número sequencial do registro (6 dígitos)
+//
+// ACHADO (22/07/2026): as posições 111-117 (data de ocorrência) e 117-135
+// (nº do documento completo + confirmação do nosso número) nunca eram
+// sobrescritas pelo código - ficavam congeladas com o valor do título de
+// EXEMPLO usado pra montar o DETAIL_TEMPLATE ("150626" / "06564707"),
+// idêntico em toda linha de toda exportação já gerada. Corrigido abaixo.
+//
+// CONFIRMADO independentemente contra CN20076A.RET - um arquivo de OUTRO
+// cliente do G3 (não FENTE FILM), recebido como padrão de referência de
+// como o arquivo precisa sair pro G3 ler. Nele, 117-127 varia por título
+// completo ("004883/A", "004883/B", "004883/C"...) e 127-135 repete
+// exatamente o nosso_numero de cada linha - bate 100% com a correção acima.
+//
+// ACHADO (22/07/2026): o "título" que o G3 realmente reconhece NÃO é o
+// campo seu_numero da remessa (posição 43-52, sem barra, ex "202600626A") -
+// é um campo DIFERENTE, na posição 109-118 da própria remessa, que já vem
+// COM a barra antes da letra da parcela (ex "01600626/A"). Confirmado pelo
+// usuário comparando com o G3. Esse campo é extraído em cnabRemessa.js
+// como `tituloG3` e gravado em `titulos.titulo_g3`. As posições 42 e 116
+// do .RET de saída agora usam titulo_g3 (com barra), não mais seu_numero.
+// O casamento título×retorno em upload-retorno.js CONTINUA usando
+// seu_numero (sem barra) - é um campo diferente, com propósito diferente.
 //
 // Header:
 //   76-79   código do banco/portador
@@ -74,25 +100,21 @@ function valorParaCNAB(valor, tamanho = 13) {
   return pad(centavos, tamanho)
 }
 
-// Referência do título na posição 42-52 (10 posições) - CONFIRMADO que é
-// essa a posição que o G3 lê como "Título" (mesma posição usada na própria
-// remessa, ex "202600116A"). O campo na posição 116 é só um eco interno que
-// o G3 NÃO usa - descoberto comparando o .RET gerado com a saída real do
-// G3 ("Lista do Processamento"), que mostrava o MESMO título repetido pra
-// todos os registros porque só a posição 116 estava sendo atualizada.
-function tituloParaPosicao42(seuNumero) {
-  const s = String(seuNumero || '').trim().toUpperCase()
+// Título na posição 42-52 (10 posições) - CONFIRMADO que é essa a posição
+// que o G3 lê. Usa `titulo_g3` (com barra, ex "01600626/A" - o formato que
+// o G3 realmente reconhece), com fallback pro `seu_numero` antigo (sem
+// barra) só pra títulos gravados antes dessa coluna existir.
+function tituloParaPosicao42(t) {
+  const s = String(t.titulo_g3 || t.seu_numero || '').trim().toUpperCase()
   if (s.length >= 10) return s.slice(0, 10)
   return '0'.repeat(10 - s.length) + s
 }
 
-// Referência "eco" na posição 116 (8 posições, ex "000728/G") - mantida por
-// consistência/histórico, mas o G3 não usa esse campo para identificar o título.
-function referenciaTitulo(seuNumero) {
-  const s = String(seuNumero || '').trim()
-  if (s.length <= 8) return padDireita(s, 8)
-  return s.slice(0, 8)
-}
+// Nº do documento de cobrança, posição 117-126 (10 posições) - mesmo valor
+// e mesma regra da posição 42 (tituloParaPosicao42). Antes só escrevíamos
+// 8 dos 10 caracteres desse campo, deixando os 2 últimos com lixo
+// congelado do template original (ex: "/C" de um título de exemplo) -
+// agora usa a mesma função pra escrever o campo completo.
 
 export default async function handler(req, res) {
   try {
@@ -141,10 +163,12 @@ export default async function handler(req, res) {
       const mov = movimentosBaixa[0]
 
       let linha = DETAIL_TEMPLATE
-      linha = setAt(linha, 42, tituloParaPosicao42(t.seu_numero)) // <-- campo real lido pelo G3
+      linha = setAt(linha, 42, tituloParaPosicao42(t)) // <-- campo real lido pelo G3 (com barra)
       linha = setAt(linha, 62, pad(t.nosso_numero, 8))
       linha = setAt(linha, 108, '06')
-      linha = setAt(linha, 116, referenciaTitulo(t.seu_numero))
+      linha = setAt(linha, 110, isoParaDDMMAA(mov?.data_ocorrencia)) // antes ficava congelado
+      linha = setAt(linha, 116, tituloParaPosicao42(t)) // nº do documento completo (10 posições)
+      linha = setAt(linha, 126, pad(t.nosso_numero, 8)) // confirmação do nosso número - antes ficava congelada
       linha = setAt(linha, 146, isoParaDDMMAA(mov?.data_ocorrencia))
       // Usa sempre o VALOR DO TÍTULO (contratado), não o valor pago no
       // retorno - eventuais diferenças (juros, liquidação combinada, etc.)

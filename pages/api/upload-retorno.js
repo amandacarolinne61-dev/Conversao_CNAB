@@ -14,32 +14,26 @@ const STATUS_POR_OCORRENCIA = {
   '15': 'baixa_rejeitada',
 }
 
-// Normaliza o Nosso Número pra comparação: só dígitos, sem zero à esquerda.
-function normalizarNossoNumero(valor) {
-  const digitos = String(valor || '').replace(/\D/g, '')
-  const semZerosEsquerda = digitos.replace(/^0+/, '')
-  return semZerosEsquerda || '0'
+// Normaliza o número do título (Seu Número) pra comparação: remove tudo
+// que não for letra/dígito (barra, espaço, traço) e ignora maiúsc./minúsc.
+// Nunca retorna string vazia como chave válida - ver uso abaixo.
+function normalizarNumeroTitulo(valor) {
+  return String(valor || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
 }
 
-// Normaliza CNPJ pra comparação: só dígitos (tira ponto, barra, traço).
-function normalizarCnpj(valor) {
-  return String(valor || '').replace(/\D/g, '')
-}
-
-// CHAVE DE CASAMENTO REAL: CNPJ do cedente + Nosso Número.
+// CHAVE DE CASAMENTO: número do título (Seu Número / Nº do Documento).
 //
-// O schema de `titulos` tem `unique (remessa_id, nosso_numero)` - ou seja,
-// o Nosso Número só é garantido único DENTRO da mesma remessa/cliente.
-// Clientes diferentes (ex: GLEISIANE, FENTE FILM, ZPEL) podem ter títulos
-// com o MESMO Nosso Número em remessas separadas. Buscar só por Nosso
-// Número (sem saber de qual cliente) arrisca casar com o título errado.
+// É a "chave forte" do sistema - definida pelo usuário antes de gerar a
+// remessa, não pelo layout do banco. Diferente do Nosso Número (que só é
+// único DENTRO de uma remessa - `unique (remessa_id, nosso_numero)` - e
+// não ajuda a diferenciar clientes/sacados quando o CNPJ do cedente é
+// sempre o mesmo), o número do título já mora direto em `titulos.seu_numero`
+// e no retorno em `mov.seuNumeroRaw`, sem precisar juntar com `remessas`.
 //
-// O CNPJ do cedente mora na tabela `remessas` (não em `titulos`), então
-// pra montar essa chave é preciso buscar `titulos` já unido com sua
-// respectiva `remessas.cnpj_cedente`.
-function chaveComposta(cnpjCedente, nossoNumero) {
-  return `${normalizarCnpj(cnpjCedente)}|${normalizarNossoNumero(nossoNumero)}`
-}
+// Só que já houve um caso real (FENTE FILM) de Seu Número repetido em até
+// 9 títulos DIFERENTES, com sacados diferentes. Por isso NUNCA escolhemos
+// um título automaticamente quando a busca encontra mais de um - ver
+// `indiceTitulos` e `titulosAmbiguos` abaixo.
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -58,64 +52,42 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Nenhum movimento encontrado no arquivo' })
     }
 
-    // --- Busca títulos e remessas SEPARADAMENTE e junta em JS ---
-    // (evita depender do Supabase resolver automaticamente o relacionamento
-    // titulos.remessa_id -> remessas.id, que pode falhar silenciosamente
-    // dependendo de como a FK foi declarada, devolvendo cnpj_cedente vazio
-    // pra todo mundo e quebrando a chave composta sem erro nenhum na tela)
+    // --- Busca todos os títulos e agrupa por número do título ---
+    // Guarda TODOS os candidatos por chave (não só o mais recente) - se
+    // mais de um título tiver o mesmo número, isso vira ambiguidade
+    // detectável abaixo, em vez de escolher um silenciosamente.
     const { data: todosTitulos, error: erroTitulos } = await supabase
       .from('titulos')
-      .select('id, remessa_id, nosso_numero, status, criado_em')
+      .select('id, remessa_id, nosso_numero, seu_numero, status, criado_em')
 
     if (erroTitulos) throw erroTitulos
 
-    const { data: todasRemessas, error: erroRemessas } = await supabase
-      .from('remessas')
-      .select('id, cnpj_cedente')
-
-    if (erroRemessas) throw erroRemessas
-
-    const cnpjPorRemessaId = new Map((todasRemessas || []).map((r) => [r.id, r.cnpj_cedente]))
-
     const indiceTitulos = new Map()
     for (const t of todosTitulos || []) {
-      const cnpjCedente = cnpjPorRemessaId.get(t.remessa_id)
-      const chave = chaveComposta(cnpjCedente, t.nosso_numero)
-      const atual = indiceTitulos.get(chave)
-      if (!atual || new Date(t.criado_em) > new Date(atual.criado_em)) {
-        indiceTitulos.set(chave, t)
-      }
+      const chave = normalizarNumeroTitulo(t.seu_numero)
+      if (!chave) continue // nunca indexa título sem número - evita casar "vazio com vazio"
+      if (!indiceTitulos.has(chave)) indiceTitulos.set(chave, [])
+      indiceTitulos.get(chave).push(t)
     }
 
-    // --- Duplicidade: mesmo cedente + Nosso Número + mesma ocorrência + mesma data já existe? ---
-    // (mesma lógica: busca movimentos_retorno e retornos separadamente e
-    // junta em JS, em vez de depender do join automático do Supabase)
+    // --- Duplicidade: mesmo número de título + mesma ocorrência + mesma data já existe? ---
     const { data: movimentosExistentes, error: erroChecagem } = await supabase
       .from('movimentos_retorno')
-      .select('retorno_id, nosso_numero, ocorrencia_codigo, data_ocorrencia')
+      .select('seu_numero_raw, ocorrencia_codigo, data_ocorrencia')
 
     if (erroChecagem) throw erroChecagem
 
-    const { data: todosRetornos, error: erroRetornos } = await supabase
-      .from('retornos')
-      .select('id, cnpj_cedente')
-
-    if (erroRetornos) throw erroRetornos
-
-    const cnpjPorRetornoId = new Map((todosRetornos || []).map((r) => [r.id, r.cnpj_cedente]))
-
     const chaveExistente = new Set(
-      (movimentosExistentes || []).map((m) => {
-        const cnpjCedente = cnpjPorRetornoId.get(m.retorno_id)
-        return `${chaveComposta(cnpjCedente, m.nosso_numero)}|${m.ocorrencia_codigo}|${m.data_ocorrencia}`
-      })
+      (movimentosExistentes || []).map(
+        (m) => `${normalizarNumeroTitulo(m.seu_numero_raw)}|${m.ocorrencia_codigo}|${m.data_ocorrencia}`
+      )
     )
 
     const cnpjCedenteDesteArquivo = movimentos[0]?.cnpjCedente
 
     const duplicados = movimentos.filter((m) =>
       chaveExistente.has(
-        `${chaveComposta(cnpjCedenteDesteArquivo, m.nossoNumeroFactoring)}|${m.ocorrenciaCodigo}|${m.dataOcorrencia}`
+        `${normalizarNumeroTitulo(m.seuNumeroRaw)}|${m.ocorrenciaCodigo}|${m.dataOcorrencia}`
       )
     )
 
@@ -151,9 +123,29 @@ export default async function handler(req, res) {
     if (erroRetorno) throw erroRetorno
 
     // --- Grava todos os movimentos de uma vez (1 insert em lote em vez de N) ---
+    // titulosAmbiguos: números de título que bateram em mais de um título
+    // cadastrado - não escolhemos nenhum automaticamente (ver comentário
+    // de normalizarNumeroTitulo acima), fica pra resolução manual.
+    const titulosAmbiguos = []
+
     const linhasParaGravar = movimentos.map((mov) => {
-      const chave = chaveComposta(mov.cnpjCedente, mov.nossoNumeroFactoring)
-      const titulo = indiceTitulos.get(chave) || null
+      const chave = normalizarNumeroTitulo(mov.seuNumeroRaw)
+      const candidatos = chave ? indiceTitulos.get(chave) || [] : []
+      const ambiguo = candidatos.length > 1
+      const titulo = candidatos.length === 1 ? candidatos[0] : null
+
+      if (ambiguo) {
+        titulosAmbiguos.push({
+          numeroTitulo: mov.seuNumeroRaw,
+          nossoNumero: mov.nossoNumeroFactoring,
+          titulosEncontrados: candidatos.map((t) => ({
+            id: t.id,
+            nossoNumero: t.nosso_numero,
+            status: t.status,
+          })),
+        })
+      }
+
       const ref = refMap[mov.ocorrenciaCodigo]
       const geraBaixa = ref ? ref.gera_baixa : false
 
@@ -172,6 +164,7 @@ export default async function handler(req, res) {
           gera_baixa: geraBaixa,
         },
         titulo,
+        ambiguo,
         mov,
         ref,
         geraBaixa,
@@ -196,24 +189,31 @@ export default async function handler(req, res) {
       await supabase.from('titulos').update({ status: novoStatus }).in('id', ids)
     }
 
-    const resultado = linhasParaGravar.map(({ mov, titulo, ref, geraBaixa }) => ({
+    const resultado = linhasParaGravar.map(({ mov, titulo, ambiguo, ref, geraBaixa }) => ({
       nossoNumero: mov.nossoNumeroFactoring,
       seuNumero: mov.seuNumeroRaw,
       encontrado: !!titulo,
+      ambiguo,
       ocorrencia: mov.ocorrenciaCodigo,
       descricao: ref ? ref.descricao : 'Código não mapeado',
       valorPago: mov.valorPago,
       geraBaixa,
     }))
 
-    const semTitulo = resultado.filter((r) => !r.encontrado).length
+    const semTitulo = resultado.filter((r) => !r.encontrado && !r.ambiguo).length
+    const totalAmbiguos = titulosAmbiguos.length
 
     return res.status(200).json({
       ok: true,
       retornoId: retorno.id,
       resultado,
-      resumo: `Retorno processado: ${resultado.length} movimento(s), ${semTitulo} sem título correspondente.`,
+      resumo: `Retorno processado: ${resultado.length} movimento(s), ${semTitulo} sem título correspondente${
+        totalAmbiguos > 0
+          ? `, ${totalAmbiguos} com número de título duplicado (revisão manual necessária)`
+          : ''
+      }.`,
       linhasIgnoradas: linhasIgnoradas.length > 0 ? linhasIgnoradas : undefined,
+      titulosAmbiguos: totalAmbiguos > 0 ? titulosAmbiguos : undefined,
     })
   } catch (err) {
     console.error(err)

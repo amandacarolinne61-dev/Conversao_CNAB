@@ -77,12 +77,19 @@ export default function Home() {
       })
       const data = await resp.json()
       if (!resp.ok) throw new Error(data.error)
-      const naoEncontrados = data.resultado.filter((r) => !r.encontrado).length
+      const naoEncontrados = data.resultado.filter((r) => !r.encontrado && !r.ambiguo).length
+      const ambiguos = data.titulosAmbiguos || []
       setMensagem({
-        tipo: 'ok',
+        tipo: ambiguos.length > 0 ? 'aviso' : 'ok',
         texto: `Retorno processado: ${data.resultado.length} movimento(s)${
           naoEncontrados ? `, ${naoEncontrados} sem título correspondente` : ''
-        }.`,
+        }${
+          ambiguos.length > 0
+            ? `. ⚠️ ${ambiguos.length} com número de título duplicado, não vinculados automaticamente: ${ambiguos
+                .map((a) => a.numeroTitulo)
+                .join(', ')} — resolva manualmente.`
+            : '.'
+        }`,
       })
       carregarTitulos()
     } catch (err) {
