@@ -15,6 +15,24 @@ function formatarData(iso) {
   return `${dia}/${mes}/${ano}`
 }
 
+function formatarMoeda(v) {
+  return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+// Deriva de cada título os campos calculados a partir de movimentos_retorno
+// (valor pago mais recente, diferença) - usado tanto pro filtro por coluna
+// quanto pra renderização da linha, pra não duplicar essa lógica em dois
+// lugares.
+function derivarTitulo(t) {
+  const ultimoMov = (t.movimentos_retorno || []).sort((a, b) =>
+    (b.data_ocorrencia || '').localeCompare(a.data_ocorrencia || '')
+  )[0]
+  const valorTitulo = Number(t.valor_titulo || 0)
+  const valorPago = ultimoMov && ultimoMov.valor_pago != null ? Number(ultimoMov.valor_pago) : null
+  const diferenca = valorPago != null ? valorPago - valorTitulo : null
+  return { ultimoMov, valorTitulo, valorPago, diferenca }
+}
+
 const STATUS_LABEL = {
   aguardando_retorno: { texto: 'Aguardando retorno', bg: 'var(--cor-neutro-bg)', tx: 'var(--cor-neutro-tx)' },
   liquidado: { texto: 'Liquidado', bg: 'var(--cor-verde-bg)', tx: 'var(--cor-verde-tx)' },
@@ -32,19 +50,48 @@ export default function Home() {
   const [selecionados, setSelecionados] = useState(() => new Set())
   const [factoringRemessa, setFactoringRemessa] = useState('bancorp')
   const [factoringRetorno, setFactoringRetorno] = useState('bancorp')
-  const [filtro, setFiltro] = useState('')
+  const FILTROS_VAZIOS = {
+    nossoNumero: '',
+    seuNumero: '',
+    portador: '',
+    sacado: '',
+    valor: '',
+    valorPago: '',
+    diferenca: '',
+    vencimento: '',
+    status: '',
+    ultimaOcorrencia: '',
+  }
+  const [filtros, setFiltros] = useState(FILTROS_VAZIOS)
 
-  // Filtro de pesquisa da tabela de títulos - busca por Nosso Número, Seu
-  // Número, sacado ou banco/portador, sem diferenciar maiúsc./acentos.
-  // Aplicado no que já está carregado (sem chamada nova ao servidor).
-  const filtroNormalizado = filtro.trim().toLowerCase()
-  const titulosFiltrados = filtroNormalizado
-    ? titulos.filter((t) =>
-        [t.nosso_numero, t.seu_numero, t.nome_sacado, t.remessas?.portador_nome]
-          .filter(Boolean)
-          .some((campo) => campo.toLowerCase().includes(filtroNormalizado))
-      )
-    : titulos
+  function atualizarFiltro(campo, valor) {
+    setFiltros((atual) => ({ ...atual, [campo]: valor }))
+  }
+
+  const temFiltroAtivo = Object.values(filtros).some(Boolean)
+
+  // Filtro por coluna - cada campo de texto compara substring sem
+  // diferenciar maiúsc.; Status é seleção exata. Aplicado no que já está
+  // carregado (sem chamada nova ao servidor).
+  const titulosFiltrados = titulos.filter((t) => {
+    const { valorTitulo, valorPago, diferenca, ultimoMov } = derivarTitulo(t)
+
+    const contem = (valorFiltro, valorCampo) =>
+      !valorFiltro || String(valorCampo ?? '').toLowerCase().includes(valorFiltro.trim().toLowerCase())
+
+    return (
+      contem(filtros.nossoNumero, t.nosso_numero) &&
+      contem(filtros.seuNumero, t.seu_numero) &&
+      contem(filtros.portador, t.remessas?.portador_nome) &&
+      contem(filtros.sacado, t.nome_sacado) &&
+      contem(filtros.valor, formatarMoeda(valorTitulo)) &&
+      contem(filtros.valorPago, valorPago != null ? formatarMoeda(valorPago) : '') &&
+      contem(filtros.diferenca, diferenca != null ? formatarMoeda(diferenca) : '') &&
+      contem(filtros.vencimento, formatarData(t.data_vencimento)) &&
+      (!filtros.status || t.status === filtros.status) &&
+      contem(filtros.ultimaOcorrencia, ultimoMov ? ultimoMov.ocorrencia_descricao : '')
+    )
+  })
 
   const carregarTitulos = useCallback(async () => {
     const resp = await fetch('/api/titulos')
@@ -165,12 +212,7 @@ export default function Home() {
 
     const linhas = titulosFiltrados.map((t) => {
       const status = STATUS_LABEL[t.status] || { texto: t.status }
-      const ultimoMov = (t.movimentos_retorno || []).sort((a, b) =>
-        (b.data_ocorrencia || '').localeCompare(a.data_ocorrencia || '')
-      )[0]
-      const valorTitulo = Number(t.valor_titulo || 0)
-      const valorPago = ultimoMov && ultimoMov.valor_pago != null ? Number(ultimoMov.valor_pago) : null
-      const diferenca = valorPago != null ? valorPago - valorTitulo : null
+      const { valorTitulo, valorPago, diferenca, ultimoMov } = derivarTitulo(t)
 
       return [
         t.nosso_numero,
@@ -298,28 +340,11 @@ export default function Home() {
       <section>
         <div className="titulos-header">
           <h2>Títulos</h2>
-          <div className="titulos-header-busca">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <input
-              type="text"
-              placeholder="Buscar por nosso número, seu número, sacado ou banco..."
-              value={filtro}
-              onChange={(e) => setFiltro(e.target.value)}
-            />
-            {filtro && (
-              <button className="btn-limpar-busca" onClick={() => setFiltro('')} title="Limpar busca">
-                ×
-              </button>
-            )}
-          </div>
+          {temFiltroAtivo && (
+            <button className="btn-limpar-busca" onClick={() => setFiltros(FILTROS_VAZIOS)}>
+              × Limpar filtros ({titulosFiltrados.length} de {titulos.length})
+            </button>
+          )}
           <div className="titulos-header-acoes">
             {selecionados.size > 0 && (
               <button className="btn-gerar-remessa" onClick={gerarRemessaSelecionados}>
@@ -370,6 +395,91 @@ export default function Home() {
               <th>Status</th>
               <th>Última ocorrência</th>
             </tr>
+            <tr className="linha-filtros">
+              <th></th>
+              <th>
+                <input
+                  type="text"
+                  value={filtros.nossoNumero}
+                  onChange={(e) => atualizarFiltro('nossoNumero', e.target.value)}
+                  placeholder="filtrar..."
+                />
+              </th>
+              <th>
+                <input
+                  type="text"
+                  value={filtros.seuNumero}
+                  onChange={(e) => atualizarFiltro('seuNumero', e.target.value)}
+                  placeholder="filtrar..."
+                />
+              </th>
+              <th>
+                <input
+                  type="text"
+                  value={filtros.portador}
+                  onChange={(e) => atualizarFiltro('portador', e.target.value)}
+                  placeholder="filtrar..."
+                />
+              </th>
+              <th>
+                <input
+                  type="text"
+                  value={filtros.sacado}
+                  onChange={(e) => atualizarFiltro('sacado', e.target.value)}
+                  placeholder="filtrar..."
+                />
+              </th>
+              <th>
+                <input
+                  type="text"
+                  value={filtros.valor}
+                  onChange={(e) => atualizarFiltro('valor', e.target.value)}
+                  placeholder="filtrar..."
+                />
+              </th>
+              <th>
+                <input
+                  type="text"
+                  value={filtros.valorPago}
+                  onChange={(e) => atualizarFiltro('valorPago', e.target.value)}
+                  placeholder="filtrar..."
+                />
+              </th>
+              <th>
+                <input
+                  type="text"
+                  value={filtros.diferenca}
+                  onChange={(e) => atualizarFiltro('diferenca', e.target.value)}
+                  placeholder="filtrar..."
+                />
+              </th>
+              <th>
+                <input
+                  type="text"
+                  value={filtros.vencimento}
+                  onChange={(e) => atualizarFiltro('vencimento', e.target.value)}
+                  placeholder="dd/mm/aaaa"
+                />
+              </th>
+              <th>
+                <select value={filtros.status} onChange={(e) => atualizarFiltro('status', e.target.value)}>
+                  <option value="">todos</option>
+                  {Object.entries(STATUS_LABEL).map(([valor, info]) => (
+                    <option key={valor} value={valor}>
+                      {info.texto}
+                    </option>
+                  ))}
+                </select>
+              </th>
+              <th>
+                <input
+                  type="text"
+                  value={filtros.ultimaOcorrencia}
+                  onChange={(e) => atualizarFiltro('ultimaOcorrencia', e.target.value)}
+                  placeholder="filtrar..."
+                />
+              </th>
+            </tr>
           </thead>
           <tbody>
             {titulosFiltrados.map((t) => {
@@ -378,15 +488,8 @@ export default function Home() {
                 bg: 'var(--cor-neutro-bg)',
                 tx: 'var(--cor-neutro-tx)',
               }
-              const ultimoMov = (t.movimentos_retorno || []).sort((a, b) =>
-                (b.data_ocorrencia || '').localeCompare(a.data_ocorrencia || '')
-              )[0]
-              const valorTitulo = Number(t.valor_titulo || 0)
-              const valorPago = ultimoMov && ultimoMov.valor_pago != null ? Number(ultimoMov.valor_pago) : null
-              const diferenca = valorPago != null ? valorPago - valorTitulo : null
+              const { ultimoMov, valorTitulo, valorPago, diferenca } = derivarTitulo(t)
               const temDiferenca = diferenca != null && Math.abs(diferenca) > 0.005
-              const formatarMoeda = (v) =>
-                v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
               return (
                 <tr key={t.id}>
                   <td>
