@@ -82,7 +82,7 @@ const STATUS_LABEL = {
   ver_manual: { texto: 'Ver manual', bg: 'var(--cor-ambar-bg)', tx: 'var(--cor-ambar-tx)' },
 }
 
-const STATUS_VENCIDO = { texto: 'Vencido', bg: 'var(--cor-ciano-bg)', tx: 'var(--cor-ciano-tx)' }
+const STATUS_VENCIDO = { texto: 'Vencido', bg: 'var(--cor-vermelho-bg)', tx: 'var(--cor-vermelho-tx)' }
 
 export default function Home() {
   const [titulos, setTitulos] = useState([])

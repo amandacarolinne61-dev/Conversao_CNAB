@@ -14,19 +14,17 @@
   --shadow-lg: 0 12px 32px rgba(19, 22, 41, 0.1), 0 2px 6px rgba(19, 22, 41, 0.05);
 
   /* Paleta de status validada com scripts/validate_palette.js (skill de
-     dataviz): as 5 cores cromáticas passam separação de daltonismo e piso
+     dataviz): as 4 cores cromáticas passam separação de daltonismo e piso
      de visão normal entre si (pairs all). O cinza neutro fica de fora dessa
      checagem de propósito - acromático por design, sempre com ícone/rótulo
-     junto, nunca só a cor. Ciano (vencido) foi escolhido só depois de testar
-     várias opções de laranja/marrom contra as 4 cores já existentes - todas
-     falharam o piso de visão normal por ficarem perto demais do âmbar
-     (baixado/ver manual); ciano foi a que passou em todos os checks. */
+     junto, nunca só a cor. "Vencido" reaproveita o vermelho (pedido
+     explícito do usuário) em vez de ganhar uma cor própria - visualmente
+     igual a Rejeitado/Baixa rejeitada na tabela principal. */
   --cor-neutro-bg: #eef0f3;   --cor-neutro-tx: #4b5563;
   --cor-azul-bg: #e6ecff;     --cor-azul-tx: #2f4bd0;
   --cor-verde-bg: #e2f6ea;    --cor-verde-tx: #15803d;
   --cor-ambar-bg: #fef3e2;    --cor-ambar-tx: #d97706;
   --cor-vermelho-bg: #fce7ef; --cor-vermelho-tx: #9d174d;
-  --cor-ciano-bg: #e0f7fa;    --cor-ciano-tx: #0891b2;
 }
 
 * { box-sizing: border-box; }
@@ -562,7 +560,7 @@ input[type='checkbox']:disabled {
 
 .dashboard-factoring-tabela {
   display: grid;
-  grid-template-columns: minmax(120px, 1.3fr) 70px repeat(4, minmax(112px, 1fr));
+  grid-template-columns: minmax(120px, 1.3fr) 76px repeat(3, minmax(112px, 1fr));
   column-gap: 6px;
   row-gap: 4px;
 }
@@ -618,6 +616,20 @@ input[type='checkbox']:disabled {
   border-radius: 0 8px 8px 0;
 }
 
+.total-numero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.25;
+}
+
+.total-numero small {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: baseline;
@@ -636,7 +648,7 @@ input[type='checkbox']:disabled {
 
 @media (max-width: 780px) {
   .dashboard-factoring-tabela {
-    grid-template-columns: minmax(90px, 1fr) 56px repeat(4, minmax(92px, 1fr));
+    grid-template-columns: minmax(90px, 1fr) 60px repeat(3, minmax(92px, 1fr));
     font-size: 0.78rem;
     overflow-x: auto;
   }

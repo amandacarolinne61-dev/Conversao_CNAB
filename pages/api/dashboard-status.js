@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     // server-side o tempo todo (ver lib/supabaseClient.js).
     const { data: titulosValores, error: erroValores } = await supabase
       .from('titulos')
-      .select('status, valor_titulo, remessa_id, exportado_em, data_vencimento')
+      .select('status, valor_titulo, remessa_id, data_vencimento')
 
     if (erroValores) throw erroValores
 
@@ -61,11 +61,17 @@ export default async function handler(req, res) {
     const hojeISO = hojeISOBrasil()
     const vazioFactoring = () => ({
       total: 0,
+      totalValor: 0,
       aberto: { quantidade: 0, valor: 0 },
       vencido: { quantidade: 0, valor: 0 },
       liquidado: { quantidade: 0, valor: 0 },
-      faltaBaixar: { quantidade: 0, valor: 0 },
     })
+
+    // Totais gerais de aberto/vencido (todas as factorings somadas) pro
+    // topo do dashboard - calculados no mesmo laço que o painel por
+    // factoring, pra garantir que os dois batem entre si.
+    const aberto = { quantidade: 0, valor: 0 }
+    const vencido = { quantidade: 0, valor: 0 }
 
     const porFactoring = {}
     for (const t of titulosValores || []) {
@@ -75,25 +81,21 @@ export default async function handler(req, res) {
       const valor = Number(t.valor_titulo || 0)
 
       grupo.total++
+      grupo.totalValor += valor
       if (ABERTO.has(t.status)) {
         // Vencido = ainda aberto (sem confirmação de liquidação) e com
         // vencimento já passado - sai da contagem de "aberto" (mutuamente
         // exclusivo), não some da conta: aberto + vencido = total em aberto.
-        if (t.data_vencimento && t.data_vencimento < hojeISO) {
-          grupo.vencido.quantidade++
-          grupo.vencido.valor += valor
-        } else {
-          grupo.aberto.quantidade++
-          grupo.aberto.valor += valor
-        }
+        const grupoAlvo = t.data_vencimento && t.data_vencimento < hojeISO ? 'vencido' : 'aberto'
+        grupo[grupoAlvo].quantidade++
+        grupo[grupoAlvo].valor += valor
+        const totalAlvo = grupoAlvo === 'vencido' ? vencido : aberto
+        totalAlvo.quantidade++
+        totalAlvo.valor += valor
       }
       if (t.status === 'liquidado') {
         grupo.liquidado.quantidade++
         grupo.liquidado.valor += valor
-        if (!t.exportado_em) {
-          grupo.faltaBaixar.quantidade++
-          grupo.faltaBaixar.valor += valor
-        }
       }
     }
 
@@ -101,6 +103,8 @@ export default async function handler(req, res) {
       porStatus,
       valorPorStatus,
       porFactoring,
+      aberto,
+      vencido,
       total,
       atualizadoEm: new Date().toISOString(),
     })

@@ -30,28 +30,26 @@ const FACTORING_LABEL = {
 
 const COR_NEUTRO = '#6b7280'
 const COR_ABERTO = '#2563eb'
-const COR_VENCIDO = '#0891b2'
+const COR_VENCIDO = '#9d174d'
 const COR_LIQUIDADO = '#15803d'
-const COR_FALTA_BAIXAR = '#dc2626'
 
 // Colunas de status do painel "Por factoring" - cor de cada uma é usada
 // tanto na faixa de fundo quanto no badge dentro da célula, pra manter o
-// mesmo significado de cor em toda a coluna. Cor do "vencido" (ciano) foi
-// escolhida com scripts/validate_palette.js (skill de dataviz) - várias
-// opções de laranja/marrom testadas contra as outras 4 cores falharam o
-// piso de visão normal por ficarem perto demais do vermelho, só o ciano
-// passou em todos os checks.
+// mesmo significado de cor em toda a coluna. "Vencido" reaproveita o
+// vermelho (--cor-vermelho-tx) em vez de ganhar uma cor própria - pedido
+// explícito do usuário, mesmo reaparecendo igual a Rejeitado/Baixa
+// rejeitada na tabela principal.
 const COLUNAS_STATUS = [
   { chave: 'aberto', rotulo: 'Aguardando retorno', cor: COR_ABERTO, col: 3 },
   { chave: 'vencido', rotulo: 'Vencidos', cor: COR_VENCIDO, col: 4 },
   { chave: 'liquidado', rotulo: 'Liquidado', cor: COR_LIQUIDADO, col: 5 },
-  { chave: 'faltaBaixar', rotulo: 'Falta baixar', cor: COR_FALTA_BAIXAR, col: 6 },
 ]
 
 function somarFactoring(lista) {
   return lista.reduce(
     (soma, d) => ({
       total: soma.total + d.total,
+      totalValor: soma.totalValor + d.totalValor,
       aberto: {
         quantidade: soma.aberto.quantidade + d.aberto.quantidade,
         valor: soma.aberto.valor + d.aberto.valor,
@@ -64,17 +62,13 @@ function somarFactoring(lista) {
         quantidade: soma.liquidado.quantidade + d.liquidado.quantidade,
         valor: soma.liquidado.valor + d.liquidado.valor,
       },
-      faltaBaixar: {
-        quantidade: soma.faltaBaixar.quantidade + d.faltaBaixar.quantidade,
-        valor: soma.faltaBaixar.valor + d.faltaBaixar.valor,
-      },
     }),
     {
       total: 0,
+      totalValor: 0,
       aberto: { quantidade: 0, valor: 0 },
       vencido: { quantidade: 0, valor: 0 },
       liquidado: { quantidade: 0, valor: 0 },
-      faltaBaixar: { quantidade: 0, valor: 0 },
     }
   )
 }
@@ -96,7 +90,10 @@ function renderLinhaFactoring(rowIndex, nome, dados, destaque, key) {
         className={`factoring-celula factoring-celula-total${destaque ? ' factoring-celula-todas' : ''}`}
         style={{ gridRow: rowIndex, gridColumn: 2 }}
       >
-        {dados.total}
+        <span className="total-numero">
+          {dados.total}
+          <small>{formatarMoedaCompacta(dados.totalValor)}</small>
+        </span>
       </div>
       {COLUNAS_STATUS.map(({ chave, cor, col }) => (
         <div
@@ -115,9 +112,10 @@ function renderLinhaFactoring(rowIndex, nome, dados, destaque, key) {
 }
 
 export default function DashboardChart() {
-  const [porStatus, setPorStatus] = useState({})
   const [valorPorStatus, setValorPorStatus] = useState({})
   const [porFactoring, setPorFactoring] = useState({})
+  const [aberto, setAberto] = useState({ quantidade: 0, valor: 0 })
+  const [vencido, setVencido] = useState({ quantidade: 0, valor: 0 })
   const [total, setTotal] = useState(0)
   const [modoTempoReal, setModoTempoReal] = useState(null) // 'realtime' | 'polling'
   const pollingRef = useRef(null)
@@ -127,9 +125,10 @@ export default function DashboardChart() {
       const resp = await fetch('/api/dashboard-status')
       const data = await resp.json()
       if (resp.ok) {
-        setPorStatus(data.porStatus || {})
         setValorPorStatus(data.valorPorStatus || {})
         setPorFactoring(data.porFactoring || {})
+        setAberto(data.aberto || { quantidade: 0, valor: 0 })
+        setVencido(data.vencido || { quantidade: 0, valor: 0 })
         setTotal(data.total || 0)
       }
     } catch {
@@ -164,8 +163,6 @@ export default function DashboardChart() {
   }, [])
 
   const valorTotal = Object.values(valorPorStatus).reduce((soma, v) => soma + v, 0)
-  const emAberto = (porStatus.aguardando_retorno || 0) + (porStatus.confirmado || 0)
-  const valorEmAberto = (valorPorStatus.aguardando_retorno || 0) + (valorPorStatus.confirmado || 0)
 
   const factoringsOrdenados = Object.entries(porFactoring)
 
@@ -212,9 +209,19 @@ export default function DashboardChart() {
             className="dashboard-pill"
             style={{ background: hexParaRgba(COR_ABERTO, 0.1), color: COR_ABERTO }}
           >
-            {formatarMoeda(valorEmAberto)}
+            {formatarMoeda(aberto.valor)}
           </span>
-          <span className="dashboard-hero-rotulo">{emAberto} em aberto (aguardando/confirmado)</span>
+          <span className="dashboard-hero-rotulo">{aberto.quantidade} aguardando retorno</span>
+        </div>
+        <div className="dashboard-hero-divisor" />
+        <div className="dashboard-hero-item">
+          <span
+            className="dashboard-pill"
+            style={{ background: hexParaRgba(COR_VENCIDO, 0.1), color: COR_VENCIDO }}
+          >
+            {formatarMoeda(vencido.valor)}
+          </span>
+          <span className="dashboard-hero-rotulo">{vencido.quantidade} vencido(s)</span>
         </div>
       </div>
 
