@@ -16,13 +16,13 @@ function formatarData(iso) {
 }
 
 const STATUS_LABEL = {
-  aguardando_retorno: { texto: 'Aguardando retorno', cor: '#8a8f98' },
-  liquidado: { texto: 'Liquidado', cor: '#1a7f37' },
-  confirmado: { texto: 'Confirmado', cor: '#0969da' },
-  rejeitado: { texto: 'Rejeitado', cor: '#cf222e' },
-  baixado: { texto: 'Baixado', cor: '#9a6700' },
-  baixa_rejeitada: { texto: 'Baixa rejeitada', cor: '#cf222e' },
-  ver_manual: { texto: 'Ver manual', cor: '#9a6700' },
+  aguardando_retorno: { texto: 'Aguardando retorno', bg: 'var(--cor-neutro-bg)', tx: 'var(--cor-neutro-tx)' },
+  liquidado: { texto: 'Liquidado', bg: 'var(--cor-verde-bg)', tx: 'var(--cor-verde-tx)' },
+  confirmado: { texto: 'Confirmado', bg: 'var(--cor-azul-bg)', tx: 'var(--cor-azul-tx)' },
+  rejeitado: { texto: 'Rejeitado', bg: 'var(--cor-vermelho-bg)', tx: 'var(--cor-vermelho-tx)' },
+  baixado: { texto: 'Baixado', bg: 'var(--cor-ambar-bg)', tx: 'var(--cor-ambar-tx)' },
+  baixa_rejeitada: { texto: 'Baixa rejeitada', bg: 'var(--cor-vermelho-bg)', tx: 'var(--cor-vermelho-tx)' },
+  ver_manual: { texto: 'Ver manual', bg: 'var(--cor-ambar-bg)', tx: 'var(--cor-ambar-tx)' },
 }
 
 export default function Home() {
@@ -123,18 +123,53 @@ export default function Home() {
   return (
     <div className="container">
       <header>
-        <h1>Conciliação CNAB · Remessa &times; Retorno</h1>
-        <p className="subtitulo">Energy Power / Money Solution — Factoring</p>
+        <div className="logo-marca">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M4 12L9 17L20 6"
+              stroke="white"
+              strokeWidth="2.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+        <div>
+          <h1>Conciliação CNAB · Remessa &times; Retorno</h1>
+          <p className="subtitulo">Energy Power / Money Solution — Factoring</p>
+        </div>
       </header>
 
       <section className="cards">
         <label className="card upload-card">
+          <span className="card-icone">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M12 16V4M12 4L7 9M12 4L17 9M5 20H19"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
           <span className="card-titulo">Enviar remessa</span>
           <span className="card-desc">Arquivo gerado antes do envio ao banco/portador</span>
           <input type="file" onChange={handleUploadRemessa} disabled={carregando} />
         </label>
 
         <div className="card upload-card">
+          <span className="card-icone">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M12 4V16M12 16L7 11M12 16L17 11M5 20H19"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
           <span className="card-titulo">Enviar retorno</span>
           <span className="card-desc">Arquivo recebido da factoring</span>
           <select
@@ -150,6 +185,17 @@ export default function Home() {
         </div>
 
         <a className="card upload-card" href="/api/exportar-baixas" style={{ textDecoration: 'none' }}>
+          <span className="card-icone">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M4 4H14L20 10V20H4V4Z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
+              <path d="M14 4V10H20" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+            </svg>
+          </span>
           <span className="card-titulo">Exportar baixas</span>
           <span className="card-desc">Arquivo .RET com os títulos liquidados, pronto pra importar no G3</span>
         </a>
@@ -198,7 +244,11 @@ export default function Home() {
           </thead>
           <tbody>
             {titulos.map((t) => {
-              const status = STATUS_LABEL[t.status] || { texto: t.status, cor: '#8a8f98' }
+              const status = STATUS_LABEL[t.status] || {
+                texto: t.status,
+                bg: 'var(--cor-neutro-bg)',
+                tx: 'var(--cor-neutro-tx)',
+              }
               const ultimoMov = (t.movimentos_retorno || []).sort((a, b) =>
                 (b.data_ocorrencia || '').localeCompare(a.data_ocorrencia || '')
               )[0]
@@ -230,7 +280,7 @@ export default function Home() {
                   </td>
                   <td>{formatarData(t.data_vencimento)}</td>
                   <td>
-                    <span className="status-pill" style={{ background: status.cor }}>
+                    <span className="status-pill" style={{ background: status.bg, color: status.tx }}>
                       {status.texto}
                     </span>
                   </td>

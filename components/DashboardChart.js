@@ -4,13 +4,13 @@ import { supabaseBrowser } from '../lib/supabaseBrowserClient'
 // Ordem fixa (nunca por contagem) - mesma lógica de status usada na tabela
 // de títulos, do estado neutro até os estados finais bons/ruins.
 const STATUS_ORDEM = [
-  { chave: 'aguardando_retorno', texto: 'Aguardando retorno', cor: '#8a8f98' },
-  { chave: 'confirmado', texto: 'Confirmado', cor: '#0969da' },
-  { chave: 'liquidado', texto: 'Liquidado', cor: '#1a7f37' },
-  { chave: 'baixado', texto: 'Baixado', cor: '#9a6700' },
-  { chave: 'ver_manual', texto: 'Ver manual', cor: '#9a6700' },
-  { chave: 'rejeitado', texto: 'Rejeitado', cor: '#cf222e' },
-  { chave: 'baixa_rejeitada', texto: 'Baixa rejeitada', cor: '#cf222e' },
+  { chave: 'aguardando_retorno', texto: 'Aguardando retorno', cor: '#9095a6' },
+  { chave: 'confirmado', texto: 'Confirmado', cor: '#4f5fe0' },
+  { chave: 'liquidado', texto: 'Liquidado', cor: '#22a35e' },
+  { chave: 'baixado', texto: 'Baixado', cor: '#e0a02f' },
+  { chave: 'ver_manual', texto: 'Ver manual', cor: '#e0a02f' },
+  { chave: 'rejeitado', texto: 'Rejeitado', cor: '#e0453f' },
+  { chave: 'baixa_rejeitada', texto: 'Baixa rejeitada', cor: '#e0453f' },
 ]
 
 export default function DashboardChart() {
