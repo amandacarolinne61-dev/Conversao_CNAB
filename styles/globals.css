@@ -131,9 +131,41 @@ tbody td {
 
 tbody tr:last-child td { border-bottom: none; }
 
-td:first-child, td:nth-child(2) {
+td:nth-child(2), td:nth-child(3) {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.85rem;
+}
+
+td:first-child {
+  width: 36px;
+  text-align: center;
+}
+
+.titulos-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.titulos-header h2 {
+  margin: 0;
+}
+
+.btn-gerar-remessa {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-gerar-remessa:hover {
+  opacity: 0.9;
 }
 
 .status-pill {

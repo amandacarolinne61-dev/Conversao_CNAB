@@ -12,6 +12,14 @@ create table if not exists remessas (
   codigo_transmissao text,
   data_geracao date,
   nome_arquivo text,
+  -- Linhas brutas (400 posições) do header (tipo 0) e trailer (tipo 9) do
+  -- arquivo original enviado ao banco. Servem de base pra gerar reenvios de
+  -- remessa (função "Gerar remessa dos selecionados"): reaproveitadas
+  -- verbatim, só trocando a data de geração e o sequencial de registro -
+  -- nunca reconstruídas a partir do layout oficial, pra não arriscar errar
+  -- posição que esse projeto nunca validou byte a byte.
+  header_bruto text,
+  trailer_bruto text,
   criado_em timestamptz default now()
 );
 
@@ -23,6 +31,14 @@ create table if not exists titulos (
   titulo_g3 text,
   documento_cobranca text,
   numero_titulo text,
+  -- Linhas brutas originais (400 posições) do título na remessa: o registro
+  -- tipo 1 (detalhe) e o tipo 5 que sempre vem logo depois dele (mensagem/
+  -- endereço - confirmado byte a byte em CB210704.TXT, par 1-5 pra cada
+  -- título, sem exceção). Guardadas pra permitir reenviar o título depois
+  -- byte-idêntico ao que já foi validado, sem reconstruir do layout oficial.
+  -- Só existe pra títulos enviados a partir dessa coluna existir.
+  linha_bruta_detalhe text,
+  linha_bruta_mensagem text,
   carteira text,
   cnpj_sacado text,
   nome_sacado text,

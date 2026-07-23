@@ -29,6 +29,7 @@ export default function Home() {
   const [titulos, setTitulos] = useState([])
   const [carregando, setCarregando] = useState(false)
   const [mensagem, setMensagem] = useState(null)
+  const [selecionados, setSelecionados] = useState(() => new Set())
 
   const carregarTitulos = useCallback(async () => {
     const resp = await fetch('/api/titulos')
@@ -101,6 +102,26 @@ export default function Home() {
     }
   }
 
+  function toggleSelecionado(id) {
+    setSelecionados((atual) => {
+      const novo = new Set(atual)
+      if (novo.has(id)) novo.delete(id)
+      else novo.add(id)
+      return novo
+    })
+  }
+
+  function toggleSelecionarTodos() {
+    setSelecionados((atual) =>
+      atual.size === titulos.length ? new Set() : new Set(titulos.map((t) => t.id))
+    )
+  }
+
+  function gerarRemessaSelecionados() {
+    const ids = [...selecionados].join(',')
+    window.location.href = `/api/gerar-remessa?ids=${encodeURIComponent(ids)}`
+  }
+
   return (
     <div className="container">
       <header>
@@ -133,10 +154,25 @@ export default function Home() {
       <DashboardChart />
 
       <section>
-        <h2>Títulos</h2>
+        <div className="titulos-header">
+          <h2>Títulos</h2>
+          {selecionados.size > 0 && (
+            <button className="btn-gerar-remessa" onClick={gerarRemessaSelecionados}>
+              Gerar remessa ({selecionados.size} selecionado{selecionados.size > 1 ? 's' : ''})
+            </button>
+          )}
+        </div>
         <table>
           <thead>
             <tr>
+              <th>
+                <input
+                  type="checkbox"
+                  checked={titulos.length > 0 && selecionados.size === titulos.length}
+                  onChange={toggleSelecionarTodos}
+                  disabled={titulos.length === 0}
+                />
+              </th>
               <th>Nosso Número</th>
               <th>Seu Número</th>
               <th>Sacado</th>
@@ -162,6 +198,13 @@ export default function Home() {
                 v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
               return (
                 <tr key={t.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selecionados.has(t.id)}
+                      onChange={() => toggleSelecionado(t.id)}
+                    />
+                  </td>
                   <td>{t.nosso_numero}</td>
                   <td>{t.seu_numero}</td>
                   <td>{t.nome_sacado}</td>
@@ -182,7 +225,7 @@ export default function Home() {
             })}
             {titulos.length === 0 && (
               <tr>
-                <td colSpan={9} className="vazio">
+                <td colSpan={10} className="vazio">
                   Nenhum título ainda. Envie uma remessa pra começar.
                 </td>
               </tr>

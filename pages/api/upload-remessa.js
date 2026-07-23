@@ -59,6 +59,8 @@ export default async function handler(req, res) {
         nome_empresa: cabecalho.nomeEmpresa,
         codigo_transmissao: cabecalho.codigoTransmissao,
         nome_arquivo: nomeArquivo || null,
+        header_bruto: cabecalho.headerBruto,
+        trailer_bruto: cabecalho.trailerBruto,
       })
       .select()
       .single()
@@ -72,6 +74,8 @@ export default async function handler(req, res) {
       titulo_g3: t.tituloG3,
       documento_cobranca: t.documentoCobranca,
       numero_titulo: t.numeroTitulo,
+      linha_bruta_detalhe: t.linhaBrutaDetalhe,
+      linha_bruta_mensagem: t.linhaBrutaMensagem,
       carteira: t.carteira,
       cnpj_sacado: t.cnpjSacado,
       nome_sacado: t.nomeSacado,
