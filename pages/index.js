@@ -314,6 +314,7 @@ export default function Home() {
           >
             <option value="bancorp">Bancorp (CNAB 400)</option>
             <option value="apollo">Apollo (CNAB 400)</option>
+            <option value="baltic">Baltic (CNAB 400)</option>
             <option value="titan">Titan (CSV)</option>
           </select>
           <input type="file" onChange={handleUploadRetorno} disabled={carregando} />
