@@ -8,7 +8,7 @@ export const config = {
 // Factorings conhecidas hoje - qualquer outro valor (ou ausência de valor)
 // cai em 'bancorp', a mesma que já era a única opção antes desse campo
 // existir. Mantido em sincronia com o seletor "Enviar remessa" em
-// pages/index.js e com MAPA_CODIGO_EXPORTACAO_BAIXA em exportar-baixas.js.
+// pages/index.js.
 const FACTORINGS_VALIDAS = ['bancorp', 'titan', 'baltic', 'apollo']
 
 export default async function handler(req, res) {
