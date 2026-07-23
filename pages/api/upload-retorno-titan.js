@@ -5,23 +5,21 @@ export const config = {
   api: { bodyParser: { sizeLimit: '5mb' } },
 }
 
-// CHAVE DE CASAMENTO da Titan: numero_titulo + nome_sacado (normalizado),
-// diferente do Bancorp (que usa seu_numero sozinho - ver upload-retorno.js).
-//
-// ACHADO IMPORTANTE: `titulos.numero_titulo` é o MESMO valor pra todas as
-// parcelas (A/B/C/D...) de um mesmo título (ver comentário em
-// cnabRemessa.js) - e `nome_sacado` também é igual entre parcelas do mesmo
-// cliente. Ou seja, numero_titulo + nome_sacado NÃO diferencia qual parcela
-// específica a Titan liquidou quando o título tem mais de uma parcela - a
-// Titan não manda essa informação. Por isso, igual ao caso já resolvido pro
-// Bancorp (Seu Número repetido em 9 títulos da FENTE FILM), quando essa
-// chave bate em mais de um `titulo`, NUNCA escolhemos um automaticamente -
-// vira ambíguo pra resolução manual. O CNPJ do sacado serve pra descartar
-// falsos positivos de nome parecido entre CLIENTES diferentes, mas não
-// resolve a ambiguidade entre parcelas do mesmo cliente/título (o CNPJ é
-// igual em todas elas).
-function normalizarNumeroTituloTitan(valor) {
-  return String(valor || '').trim()
+// CHAVE DE CASAMENTO da Titan: nome_sacado (normalizado) + a base numérica
+// do "Título" da Titan comparada por SUFIXO contra `titulos.seu_numero`, com
+// a parcela (posição ordinal, A=1ª/B=2ª/C=3ª...) resolvendo qual parcela
+// específica bateu - ver o comentário grande em lib/parsers-retorno/titan.js
+// sobre por que "Título" NÃO é o `numero_titulo` (esse é igual pra todas as
+// parcelas, então nunca identificaria uma parcela específica; o formato
+// real confirmado com o usuário é "<base>-<parcela>", onde <base> é o mesmo
+// número no final do seu_numero da parcela e <parcela> é a posição
+// ordinal). O CNPJ do sacado ainda serve de desempate extra pra falso
+// positivo de nome parecido entre clientes diferentes.
+function letraEBaseDoSeuNumero(seuNumero) {
+  const valor = String(seuNumero || '').trim().toUpperCase()
+  const m = valor.match(/^(\d+)([A-Z])$/)
+  if (!m) return { letra: null, baseDigitos: null }
+  return { letra: m[2], baseDigitos: m[1] }
 }
 
 export default async function handler(req, res) {
@@ -58,21 +56,23 @@ export default async function handler(req, res) {
     const remessaIdsTitan = (remessasTitan || []).map((r) => r.id)
 
     // --- Busca todos os títulos (só das remessas da Titan) e agrupa por
-    // numero_titulo + nome_sacado ---
+    // nome_sacado normalizado - a base+parcela é resolvida por título dentro
+    // de cada grupo, na hora do casamento (loop abaixo), porque depende do
+    // `tituloBase` de cada movimento específico. ---
     const { data: todosTitulos, error: erroTitulos } = await supabase
       .from('titulos')
-      .select('id, remessa_id, nosso_numero, numero_titulo, nome_sacado, cnpj_sacado, status, criado_em')
+      .select('id, remessa_id, nosso_numero, seu_numero, nome_sacado, cnpj_sacado, status, criado_em')
       .in('remessa_id', remessaIdsTitan)
 
     if (erroTitulos) throw erroTitulos
 
-    const indiceTitulos = new Map()
+    const indicePorNome = new Map()
     for (const t of todosTitulos || []) {
-      const numero = normalizarNumeroTituloTitan(t.numero_titulo)
-      if (!numero) continue // nunca indexa título sem numero_titulo - evita casar "vazio com vazio"
-      const chave = `${numero}|${normalizarNomeSacado(t.nome_sacado)}`
-      if (!indiceTitulos.has(chave)) indiceTitulos.set(chave, [])
-      indiceTitulos.get(chave).push(t)
+      const { letra, baseDigitos } = letraEBaseDoSeuNumero(t.seu_numero)
+      if (!letra) continue // seu_numero sem letra de parcela no final - não dá pra ordenar, não indexa
+      const chave = normalizarNomeSacado(t.nome_sacado)
+      if (!indicePorNome.has(chave)) indicePorNome.set(chave, [])
+      indicePorNome.get(chave).push({ titulo: t, letra, baseDigitos })
     }
 
     // --- Duplicidade: mesmo título + mesma data de liquidação já processado? ---
@@ -84,12 +84,12 @@ export default async function handler(req, res) {
 
     const chaveExistente = new Set(
       (movimentosExistentes || []).map(
-        (m) => `${normalizarNumeroTituloTitan(m.seu_numero_raw)}|${m.ocorrencia_codigo}|${m.data_ocorrencia}`
+        (m) => `${String(m.seu_numero_raw || '').trim()}|${m.ocorrencia_codigo}|${m.data_ocorrencia}`
       )
     )
 
     const duplicados = movimentos.filter((m) =>
-      chaveExistente.has(`${normalizarNumeroTituloTitan(m.numeroTitulo)}|06|${m.dataLiquidacao}`)
+      chaveExistente.has(`${m.numeroTitulo}|06|${m.dataLiquidacao}`)
     )
 
     if (duplicados.length > 0) {
@@ -129,45 +129,55 @@ export default async function handler(req, res) {
 
     if (erroRetorno) throw erroRetorno
 
-    // titulosAmbiguos: numero_titulo + nome_sacado bateu em mais de um
-    // título cadastrado (tipicamente várias parcelas do mesmo título/
-    // cliente) - não escolhemos nenhum automaticamente, fica pra resolução
-    // manual (ver comentário no topo do arquivo).
+    // titulosAmbiguos: sobrou mais de um candidato na MESMA posição ordinal
+    // depois de filtrar por nome+base+CNPJ - só deve acontecer se dois
+    // clientes distintos tiverem nome normalizado E final de seu_numero
+    // iguais por coincidência. Fica pra resolução manual, nunca escolhemos
+    // um automaticamente.
     const titulosAmbiguos = []
-    // naoConciliados: não bateu com nenhum título - só na resposta da
-    // chamada por enquanto (mesmo padrão já usado pro Bancorp hoje: o
-    // movimento é gravado com titulo_id nulo, sem coluna extra no banco).
+    // naoConciliados: não bateu com nenhum título (base não encontrada, ou
+    // parcela fora do que existe pra esse título) - só na resposta da
+    // chamada por enquanto, mesmo padrão já usado pro Bancorp hoje.
     const naoConciliados = []
 
     const linhasParaGravar = movimentos.map((mov) => {
-      const numero = normalizarNumeroTituloTitan(mov.numeroTitulo)
-      const chave = `${numero}|${normalizarNomeSacado(mov.nomeSacado)}`
-      let candidatos = numero ? indiceTitulos.get(chave) || [] : []
+      const candidatosCliente = indicePorNome.get(normalizarNomeSacado(mov.nomeSacado)) || []
 
-      // CNPJ como critério de desempate/validação extra - útil quando o
-      // match por nome bateu em clientes diferentes por coincidência de
-      // nome normalizado; NÃO resolve ambiguidade entre parcelas do mesmo
-      // título/cliente (essas compartilham o mesmo CNPJ).
-      if (candidatos.length > 1 && mov.cnpjSacado) {
+      let candidatosTitulo = candidatosCliente.filter((c) =>
+        c.baseDigitos.endsWith(String(mov.tituloBase))
+      )
+
+      // CNPJ como desempate extra, se sobrou mais de um cliente com nome
+      // parecido e final de seu_numero coincidente.
+      if (candidatosTitulo.length > 1 && mov.cnpjSacado) {
         const cnpjLimpo = mov.cnpjSacado.replace(/\D/g, '')
-        const filtradoPorCnpj = candidatos.filter(
-          (t) => (t.cnpj_sacado || '').replace(/\D/g, '') === cnpjLimpo
+        const filtradoPorCnpj = candidatosTitulo.filter(
+          (c) => (c.titulo.cnpj_sacado || '').replace(/\D/g, '') === cnpjLimpo
         )
-        if (filtradoPorCnpj.length > 0) candidatos = filtradoPorCnpj
+        if (filtradoPorCnpj.length > 0) candidatosTitulo = filtradoPorCnpj
       }
 
-      const ambiguo = candidatos.length > 1
-      const titulo = candidatos.length === 1 ? candidatos[0] : null
-      const conciliado = !!titulo
+      candidatosTitulo.sort((a, b) => a.letra.localeCompare(b.letra))
+
+      const escolhido = candidatosTitulo[mov.tituloParcela - 1] || null
+      const titulo = escolhido ? escolhido.titulo : null
+
+      // Ambíguo de verdade só existe aqui se, mesmo depois de nome+base+
+      // CNPJ, a posição ordinal escolhida não resolve unicamente pra um
+      // título (ex: candidatosTitulo tem repetição de letra, o que não
+      // deveria acontecer - fica como salvaguarda).
+      const letrasRepetidas = new Set(candidatosTitulo.map((c) => c.letra)).size !== candidatosTitulo.length
+      const ambiguo = !!titulo && letrasRepetidas
+      const conciliado = !!titulo && !ambiguo
 
       if (ambiguo) {
         titulosAmbiguos.push({
           numeroTitulo: mov.numeroTitulo,
           nomeSacado: mov.nomeSacado,
-          titulosEncontrados: candidatos.map((t) => ({
-            id: t.id,
-            nossoNumero: t.nosso_numero,
-            status: t.status,
+          titulosEncontrados: candidatosTitulo.map((c) => ({
+            id: c.titulo.id,
+            nossoNumero: c.titulo.nosso_numero,
+            status: c.titulo.status,
           })),
         })
       } else if (!conciliado) {
@@ -180,10 +190,10 @@ export default async function handler(req, res) {
       return {
         linha: {
           retorno_id: retorno.id,
-          titulo_id: titulo ? titulo.id : null,
+          titulo_id: conciliado ? titulo.id : null,
           // Sem match, não há nosso_numero real disponível - usa o próprio
           // número do título da Titan como referência (coluna é NOT NULL).
-          nosso_numero: titulo ? titulo.nosso_numero : mov.numeroTitulo,
+          nosso_numero: conciliado ? titulo.nosso_numero : mov.numeroTitulo,
           ocorrencia_codigo: '06',
           ocorrencia_descricao: ref06 ? ref06.descricao : 'Liquidação Normal',
           data_ocorrencia: mov.dataLiquidacao,
@@ -193,7 +203,7 @@ export default async function handler(req, res) {
           seu_numero_raw: mov.numeroTitulo,
           gera_baixa: ref06 ? ref06.gera_baixa : true,
         },
-        titulo,
+        titulo: conciliado ? titulo : null,
         ambiguo,
         conciliado,
         mov,
@@ -217,6 +227,7 @@ export default async function handler(req, res) {
     const resultado = linhasParaGravar.map(({ mov, titulo, ambiguo, conciliado }) => ({
       numeroTitulo: mov.numeroTitulo,
       nomeSacado: mov.nomeSacado,
+      nossoNumero: titulo ? titulo.nosso_numero : null,
       encontrado: conciliado,
       ambiguo,
       valorPago: mov.valorPago,
