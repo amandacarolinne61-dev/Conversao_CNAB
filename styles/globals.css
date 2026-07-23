@@ -17,14 +17,23 @@
      dataviz): as 4 cores cromáticas passam separação de daltonismo e piso
      de visão normal entre si (pairs all). O cinza neutro fica de fora dessa
      checagem de propósito - acromático por design, sempre com ícone/rótulo
-     junto, nunca só a cor. "Vencido" reaproveita o vermelho (pedido
-     explícito do usuário) em vez de ganhar uma cor própria - visualmente
-     igual a Rejeitado/Baixa rejeitada na tabela principal. */
+     junto, nunca só a cor.
+     "Vencido" (--cor-vermelho-vivo-*) é uma 6ª cor cromática, pedida
+     explicitamente em vermelho puro - testei várias opções (#dc2626 e
+     vizinhas) contra as 4 já existentes e TODAS falham o piso de visão
+     normal (ΔE abaixo de 15) contra o âmbar e/ou contra o vermelho já usado
+     em Rejeitado/Baixa rejeitada - não sobra espaço no círculo de cores pra
+     uma 6ª cor distinguível quando duas delas precisam ser avermelhadas.
+     Mantive mesmo assim por pedido direto do usuário; o risco fica mitigado
+     porque cada badge sempre traz o texto do status junto (nunca só a cor
+     isolada) - mas badges dessa cor com "Rejeitado"/"Baixa rejeitada" podem
+     ficar parecidos pra quem tem baixa visão de cor. */
   --cor-neutro-bg: #eef0f3;   --cor-neutro-tx: #4b5563;
   --cor-azul-bg: #e6ecff;     --cor-azul-tx: #2f4bd0;
   --cor-verde-bg: #e2f6ea;    --cor-verde-tx: #15803d;
   --cor-ambar-bg: #fef3e2;    --cor-ambar-tx: #d97706;
   --cor-vermelho-bg: #fce7ef; --cor-vermelho-tx: #9d174d;
+  --cor-vermelho-vivo-bg: #fee2e2; --cor-vermelho-vivo-tx: #dc2626;
 }
 
 * { box-sizing: border-box; }
@@ -560,7 +569,7 @@ input[type='checkbox']:disabled {
 
 .dashboard-factoring-tabela {
   display: grid;
-  grid-template-columns: minmax(120px, 1.3fr) 76px repeat(3, minmax(112px, 1fr));
+  grid-template-columns: minmax(120px, 1.1fr) minmax(112px, 0.9fr) repeat(3, minmax(112px, 1fr));
   column-gap: 6px;
   row-gap: 4px;
 }
@@ -616,20 +625,6 @@ input[type='checkbox']:disabled {
   border-radius: 0 8px 8px 0;
 }
 
-.total-numero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1.25;
-}
-
-.total-numero small {
-  font-family: 'Inter', sans-serif;
-  font-weight: 500;
-  color: var(--muted);
-  font-size: 0.68rem;
-}
-
 .status-badge {
   display: inline-flex;
   align-items: baseline;
@@ -648,7 +643,7 @@ input[type='checkbox']:disabled {
 
 @media (max-width: 780px) {
   .dashboard-factoring-tabela {
-    grid-template-columns: minmax(90px, 1fr) 60px repeat(3, minmax(92px, 1fr));
+    grid-template-columns: minmax(90px, 1fr) minmax(92px, 1fr) repeat(3, minmax(92px, 1fr));
     font-size: 0.78rem;
     overflow-x: auto;
   }

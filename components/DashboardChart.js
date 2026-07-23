@@ -30,15 +30,16 @@ const FACTORING_LABEL = {
 
 const COR_NEUTRO = '#6b7280'
 const COR_ABERTO = '#2563eb'
-const COR_VENCIDO = '#9d174d'
+const COR_VENCIDO = '#dc2626'
 const COR_LIQUIDADO = '#15803d'
 
 // Colunas de status do painel "Por factoring" - cor de cada uma é usada
 // tanto na faixa de fundo quanto no badge dentro da célula, pra manter o
-// mesmo significado de cor em toda a coluna. "Vencido" reaproveita o
-// vermelho (--cor-vermelho-tx) em vez de ganhar uma cor própria - pedido
-// explícito do usuário, mesmo reaparecendo igual a Rejeitado/Baixa
-// rejeitada na tabela principal.
+// mesmo significado de cor em toda a coluna. "Vencido" é vermelho puro por
+// pedido explícito do usuário - ver nota longa em globals.css sobre por que
+// isso não passa na validação de daltonismo (não sobra espaço no círculo de
+// cores pra uma 6ª cor distinguível junto do âmbar e do vermelho já usado
+// em Rejeitado/Baixa rejeitada).
 const COLUNAS_STATUS = [
   { chave: 'aberto', rotulo: 'Aguardando retorno', cor: COR_ABERTO, col: 3 },
   { chave: 'vencido', rotulo: 'Vencidos', cor: COR_VENCIDO, col: 4 },
@@ -90,9 +91,9 @@ function renderLinhaFactoring(rowIndex, nome, dados, destaque, key) {
         className={`factoring-celula factoring-celula-total${destaque ? ' factoring-celula-todas' : ''}`}
         style={{ gridRow: rowIndex, gridColumn: 2 }}
       >
-        <span className="total-numero">
-          {dados.total}
-          <small>{formatarMoedaCompacta(dados.totalValor)}</small>
+        <span className="status-badge" style={{ background: COR_NEUTRO }}>
+          <b>{dados.total}</b>
+          {formatarMoedaCompacta(dados.totalValor)}
         </span>
       </div>
       {COLUNAS_STATUS.map(({ chave, cor, col }) => (
