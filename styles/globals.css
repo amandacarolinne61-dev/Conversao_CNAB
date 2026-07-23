@@ -13,11 +13,16 @@
   --shadow-md: 0 4px 16px rgba(19, 22, 41, 0.06), 0 1px 3px rgba(19, 22, 41, 0.05);
   --shadow-lg: 0 12px 32px rgba(19, 22, 41, 0.1), 0 2px 6px rgba(19, 22, 41, 0.05);
 
-  --cor-neutro-bg: #eef0f3; --cor-neutro-tx: #4b5563;
-  --cor-azul-bg: #e6ecff;  --cor-azul-tx: #3546c9;
-  --cor-verde-bg: #e2f6ea; --cor-verde-tx: #15803d;
-  --cor-ambar-bg: #fdf1de; --cor-ambar-tx: #b45309;
-  --cor-vermelho-bg: #fce8e8; --cor-vermelho-tx: #b91c1c;
+  /* Paleta de status validada com scripts/validate_palette.js (skill de
+     dataviz): as 4 cores cromáticas passam separação de daltonismo e piso
+     de visão normal entre si (pairs all). O cinza neutro fica de fora dessa
+     checagem de propósito - acromático por design, sempre com ícone/rótulo
+     junto, nunca só a cor. */
+  --cor-neutro-bg: #eef0f3;   --cor-neutro-tx: #4b5563;
+  --cor-azul-bg: #e6ecff;     --cor-azul-tx: #2f4bd0;
+  --cor-verde-bg: #e2f6ea;    --cor-verde-tx: #15803d;
+  --cor-ambar-bg: #fef3e2;    --cor-ambar-tx: #d97706;
+  --cor-vermelho-bg: #fce7ef; --cor-vermelho-tx: #9d174d;
 }
 
 * { box-sizing: border-box; }
@@ -280,6 +285,44 @@ input[type='checkbox']:disabled {
   white-space: nowrap;
 }
 
+.tabela-rodape {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.btn-exportar-excel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-exportar-excel svg {
+  width: 16px;
+  height: 16px;
+  color: #16a34a;
+}
+
+.btn-exportar-excel:hover {
+  border-color: #c7c3fb;
+  box-shadow: var(--shadow-md);
+}
+
+.btn-exportar-excel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .vazio {
   text-align: center;
   color: var(--muted);
@@ -335,66 +378,105 @@ input[type='checkbox']:disabled {
   box-shadow: 0 0 0 3px #16a34a2a;
 }
 
-.dashboard-total {
-  color: var(--muted);
-  font-size: 0.85rem;
-  margin: 4px 0 20px;
+/* --- Hero stats (linha de números-chave) --- */
+.dashboard-hero {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin: 18px 0 24px;
+  padding: 18px 22px;
+  background: linear-gradient(135deg, var(--brand-soft), #f7f6ff);
+  border: 1px solid #e2ddff;
+  border-radius: 12px;
 }
 
-.dashboard-barras {
+.dashboard-hero-item {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 2px;
 }
 
-.dashboard-linha {
-  display: grid;
-  grid-template-columns: 130px 1fr 40px;
-  align-items: center;
-  gap: 12px;
-}
-
-.dashboard-rotulo {
-  font-size: 0.82rem;
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.dashboard-trilha {
-  position: relative;
-  height: 16px;
-  background: var(--bg);
-  border-radius: 999px;
-  overflow: visible;
-}
-
-.dashboard-barra {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.4s ease;
-}
-
-.dashboard-valor {
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-align: right;
+.dashboard-hero-valor {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0e1024;
   font-family: 'IBM Plex Mono', monospace;
 }
 
-.dashboard-tooltip {
-  position: absolute;
-  top: -32px;
-  left: 0;
-  background: var(--ink);
-  color: white;
-  padding: 4px 9px;
-  border-radius: 7px;
-  font-size: 0.75rem;
-  white-space: nowrap;
-  pointer-events: none;
+.dashboard-hero-rotulo {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.dashboard-hero-divisor {
+  width: 1px;
+  align-self: stretch;
+  background: #ded8ff;
+}
+
+/* --- Tiles de status --- */
+.dashboard-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.dashboard-tile {
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dashboard-tile:hover {
+  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 
+.dashboard-tile-topo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-tile-icone {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.dashboard-tile-rotulo {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.dashboard-tile-numeros {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dashboard-tile-quantidade {
+  font-size: 1.4rem;
+  font-weight: 800;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: -0.02em;
+}
+
+.dashboard-tile-valor {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #4b5563cc;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
 @media (max-width: 720px) {
-  .dashboard-linha { grid-template-columns: 100px 1fr 32px; }
+  .dashboard-hero { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .dashboard-hero-divisor { display: none; }
+  .dashboard-tiles { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
 }

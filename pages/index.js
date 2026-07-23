@@ -120,6 +120,71 @@ export default function Home() {
     window.location.href = `/api/gerar-remessa?ids=${encodeURIComponent(ids)}`
   }
 
+  // Exportação em CSV (abre direto no Excel) com todos os campos relevantes
+  // pra conferência manual - não só o que já aparece nas colunas da tela.
+  // Feita no navegador a partir do que já está carregado, sem chamada nova
+  // ao servidor. Usa ";" como separador (padrão do Excel em pt-BR, que usa
+  // vírgula como separador decimal) e um BOM UTF-8 no início, senão o Excel
+  // exibe acentuação errada ao abrir o arquivo direto (sem passar por um
+  // assistente de importação).
+  function exportarExcel() {
+    const colunas = [
+      'Nosso Número',
+      'Seu Número',
+      'Banco/Portador',
+      'Sacado',
+      'CNPJ/CPF Sacado',
+      'Valor Título',
+      'Valor Pago',
+      'Diferença',
+      'Vencimento',
+      'Status',
+      'Última Ocorrência',
+      'Data Ocorrência',
+    ]
+
+    const escapar = (valor) => {
+      const s = String(valor ?? '')
+      return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+
+    const linhas = titulos.map((t) => {
+      const status = STATUS_LABEL[t.status] || { texto: t.status }
+      const ultimoMov = (t.movimentos_retorno || []).sort((a, b) =>
+        (b.data_ocorrencia || '').localeCompare(a.data_ocorrencia || '')
+      )[0]
+      const valorTitulo = Number(t.valor_titulo || 0)
+      const valorPago = ultimoMov && ultimoMov.valor_pago != null ? Number(ultimoMov.valor_pago) : null
+      const diferenca = valorPago != null ? valorPago - valorTitulo : null
+
+      return [
+        t.nosso_numero,
+        t.seu_numero,
+        t.remessas?.portador_nome || '',
+        t.nome_sacado,
+        t.cnpj_sacado,
+        valorTitulo.toFixed(2).replace('.', ','),
+        valorPago != null ? valorPago.toFixed(2).replace('.', ',') : '',
+        diferenca != null ? diferenca.toFixed(2).replace('.', ',') : '',
+        formatarData(t.data_vencimento),
+        status.texto,
+        ultimoMov ? ultimoMov.ocorrencia_descricao : '',
+        ultimoMov ? formatarData(ultimoMov.data_ocorrencia) : '',
+      ]
+        .map(escapar)
+        .join(';')
+    })
+
+    const conteudo = '﻿' + [colunas.join(';'), ...linhas].join('\r\n')
+    const blob = new Blob([conteudo], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `titulos_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="container">
       <header>
@@ -297,6 +362,25 @@ export default function Home() {
             )}
           </tbody>
         </table>
+
+        <div className="tabela-rodape">
+          <button
+            className="btn-exportar-excel"
+            onClick={exportarExcel}
+            disabled={titulos.length === 0}
+          >
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Exportar Excel (.csv)
+          </button>
+        </div>
       </section>
     </div>
   )
