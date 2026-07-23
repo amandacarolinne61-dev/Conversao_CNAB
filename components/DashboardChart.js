@@ -180,12 +180,12 @@ export default function DashboardChart() {
           <h3>Por factoring</h3>
           <div className="dashboard-factoring-tabela">
             <div className="dashboard-factoring-linha dashboard-factoring-cabecalho">
-              <span>Factoring</span>
-              <span>Total</span>
-              <span>Em aberto</span>
-              <span>Liquidado</span>
-              <span>Baixado</span>
-              <span>Falta baixar</span>
+              <span style={{ color: 'var(--brand-dark)' }}>Factoring</span>
+              <span style={{ color: 'var(--ink)' }}>Total</span>
+              <span style={{ color: COR_ABERTO }}>Em aberto</span>
+              <span style={{ color: COR_LIQUIDADO }}>Liquidado</span>
+              <span style={{ color: COR_BAIXADO }}>Baixado</span>
+              <span style={{ color: COR_FALTA_BAIXAR }}>Falta baixar</span>
             </div>
             {renderLinhaFactoring('Todas', somarFactoring(Object.values(porFactoring)), true)}
             {Object.entries(porFactoring).map(([chave, dados]) =>
