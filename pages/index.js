@@ -112,8 +112,13 @@ export default function Home() {
   }
 
   function toggleSelecionarTodos() {
+    // "Gerar remessa" só vale pra títulos liquidados - só esses entram no
+    // "selecionar todos" (os demais nem têm checkbox marcável na linha).
+    const liquidados = titulos.filter((t) => t.status === 'liquidado')
     setSelecionados((atual) =>
-      atual.size === titulos.length ? new Set() : new Set(titulos.map((t) => t.id))
+      liquidados.length > 0 && atual.size === liquidados.length
+        ? new Set()
+        : new Set(liquidados.map((t) => t.id))
     )
   }
 
@@ -168,9 +173,13 @@ export default function Home() {
               <th>
                 <input
                   type="checkbox"
-                  checked={titulos.length > 0 && selecionados.size === titulos.length}
+                  checked={
+                    titulos.some((t) => t.status === 'liquidado') &&
+                    titulos.filter((t) => t.status === 'liquidado').every((t) => selecionados.has(t.id))
+                  }
                   onChange={toggleSelecionarTodos}
-                  disabled={titulos.length === 0}
+                  disabled={!titulos.some((t) => t.status === 'liquidado')}
+                  title="Selecionar todos os títulos liquidados"
                 />
               </th>
               <th>Nosso Número</th>
@@ -203,6 +212,8 @@ export default function Home() {
                       type="checkbox"
                       checked={selecionados.has(t.id)}
                       onChange={() => toggleSelecionado(t.id)}
+                      disabled={t.status !== 'liquidado'}
+                      title={t.status !== 'liquidado' ? 'Só títulos liquidados podem ser incluídos numa remessa' : undefined}
                     />
                   </td>
                   <td>{t.nosso_numero}</td>

@@ -1,11 +1,12 @@
 import { supabase } from '../../lib/supabaseClient'
 
 // Gera um arquivo de remessa CNAB 400 contendo só os títulos selecionados
-// manualmente na tela, pra reenvio ao banco/portador. Não cria nem altera
-// nenhum registro no banco - é só leitura + montagem de arquivo (mesmo
-// espírito do exportar-baixas.js), então o mesmo título pode ser incluído
-// em quantos reenvios forem precisos, sem travar por já ter sido enviado
-// antes.
+// manualmente na tela, pra reenvio ao banco/portador. Só aceita títulos com
+// status 'liquidado' (mesma regra aplicada na tela, reforçada aqui). Não
+// cria nem altera nenhum registro no banco - é só leitura + montagem de
+// arquivo (mesmo espírito do exportar-baixas.js), então o mesmo título pode
+// ser incluído em quantos reenvios forem precisos, sem travar por já ter
+// sido enviado antes.
 //
 // Diferente do exportar-baixas.js (que monta a linha campo a campo a partir
 // de um template), aqui as linhas de detalhe (tipo 1) e mensagem (tipo 5) de
@@ -67,6 +68,19 @@ export default async function handler(req, res) {
 
     if (!titulos || titulos.length === 0) {
       return res.status(404).json({ error: 'Nenhum dos títulos selecionados foi encontrado' })
+    }
+
+    // Reforço server-side da mesma regra já aplicada na tela (checkbox
+    // desabilitado pra não-liquidados): só título liquidado entra numa
+    // remessa gerada por aqui.
+    const naoLiquidados = titulos.filter((t) => t.status !== 'liquidado')
+    if (naoLiquidados.length > 0) {
+      return res.status(400).json({
+        error: `⚠️ ${naoLiquidados.length} título(s) selecionado(s) não estão liquidados e não podem entrar numa remessa gerada: ${naoLiquidados
+          .slice(0, 10)
+          .map((t) => t.nosso_numero)
+          .join(', ')}${naoLiquidados.length > 10 ? '...' : ''}`,
+      })
     }
 
     const semLinhaBruta = titulos.filter((t) => !t.linha_bruta_detalhe || !t.remessas?.header_bruto)
