@@ -47,10 +47,10 @@ function derivarTitulo(t) {
   return { ultimoMov, valorTitulo, valorPago, diferenca }
 }
 
-// "Gerar remessa" (reenvio) vale pra liquidado e baixado - os únicos status
-// com linha_bruta_detalhe já gerada e sentido de reenvio ao portador (ver
-// mesma regra reforçada em pages/api/gerar-remessa.js).
-function elegivelRemessa(t) {
+// "Gerar baixa" vale pra liquidado e baixado - os únicos status que fazem
+// sentido pra (re)gerar o .RET de baixa desse título (ver mesma regra
+// reforçada em pages/api/gerar-baixa-selecionados.js).
+function elegivelGerarBaixa(t) {
   return t.status === 'liquidado' || t.status === 'baixado'
 }
 
@@ -211,10 +211,10 @@ export default function Home() {
   }
 
   function toggleSelecionarTodos() {
-    // "Gerar remessa" só vale pra títulos liquidados/baixados - só esses
+    // "Gerar baixa" só vale pra títulos liquidados/baixados - só esses
     // entram no "selecionar todos" (os demais nem têm checkbox marcável na
     // linha). Considera só o que está visível no filtro atual.
-    const elegiveis = titulosFiltrados.filter(elegivelRemessa)
+    const elegiveis = titulosFiltrados.filter(elegivelGerarBaixa)
     setSelecionados((atual) =>
       elegiveis.length > 0 && atual.size === elegiveis.length
         ? new Set()
@@ -222,9 +222,9 @@ export default function Home() {
     )
   }
 
-  function gerarRemessaSelecionados() {
+  function gerarBaixaSelecionados() {
     const ids = [...selecionados].join(',')
-    window.location.href = `/api/gerar-remessa?ids=${encodeURIComponent(ids)}`
+    window.location.href = `/api/gerar-baixa-selecionados?ids=${encodeURIComponent(ids)}`
   }
 
   // Exportação em CSV (abre direto no Excel) com todos os campos relevantes
@@ -409,8 +409,8 @@ export default function Home() {
           )}
           <div className="titulos-header-acoes">
             {selecionados.size > 0 && (
-              <button className="btn-gerar-remessa" onClick={gerarRemessaSelecionados}>
-                Gerar remessa ({selecionados.size} selecionado{selecionados.size > 1 ? 's' : ''})
+              <button className="btn-gerar-remessa" onClick={gerarBaixaSelecionados}>
+                Gerar baixa ({selecionados.size} selecionado{selecionados.size > 1 ? 's' : ''})
               </button>
             )}
             <button
@@ -439,11 +439,11 @@ export default function Home() {
                 <input
                   type="checkbox"
                   checked={
-                    titulosFiltrados.some(elegivelRemessa) &&
-                    titulosFiltrados.filter(elegivelRemessa).every((t) => selecionados.has(t.id))
+                    titulosFiltrados.some(elegivelGerarBaixa) &&
+                    titulosFiltrados.filter(elegivelGerarBaixa).every((t) => selecionados.has(t.id))
                   }
                   onChange={toggleSelecionarTodos}
-                  disabled={!titulosFiltrados.some(elegivelRemessa)}
+                  disabled={!titulosFiltrados.some(elegivelGerarBaixa)}
                   title="Selecionar todos os títulos liquidados/baixados (visíveis no filtro atual)"
                 />
               </th>
@@ -563,8 +563,8 @@ export default function Home() {
                       type="checkbox"
                       checked={selecionados.has(t.id)}
                       onChange={() => toggleSelecionado(t.id)}
-                      disabled={!elegivelRemessa(t)}
-                      title={!elegivelRemessa(t) ? 'Só títulos liquidados ou baixados podem ser incluídos numa remessa' : undefined}
+                      disabled={!elegivelGerarBaixa(t)}
+                      title={!elegivelGerarBaixa(t) ? 'Só títulos liquidados ou baixados podem gerar um arquivo de baixa' : undefined}
                     />
                   </td>
                   <td>{t.nosso_numero}</td>
