@@ -508,14 +508,18 @@ input[type='checkbox']:disabled {
 .dashboard-hero-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: flex-start;
+  gap: 6px;
 }
 
-.dashboard-hero-valor {
-  font-size: 1.5rem;
+.dashboard-pill {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 1.3rem;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: #0e1024;
   font-family: 'IBM Plex Mono', monospace;
 }
 
@@ -553,66 +557,82 @@ input[type='checkbox']:disabled {
 }
 
 .dashboard-factoring-tabela {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.dashboard-factoring-linha {
   display: grid;
-  grid-template-columns: 110px repeat(5, 1fr);
+  grid-template-columns: minmax(120px, 1.3fr) 70px repeat(4, minmax(112px, 1fr));
+  column-gap: 6px;
+  row-gap: 4px;
+}
+
+/* Faixa de fundo colorida por coluna de status - um único item de grid por
+   coluna, ocupando gridRow: 1 / -1 (cabeçalho até a última linha, seja
+   qual for a quantidade de factorings). Como o item spanned cobre também
+   os gutters do row-gap, a faixa fica contínua mesmo com espaçamento entre
+   linhas. Renderizada antes das células no DOM, então pinta atrás delas
+   (z-index:auto segue ordem do DOM dentro do grid). */
+.factoring-banda {
+  border-radius: 10px;
+  margin: 0 2px;
+}
+
+.factoring-celula {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 8px;
+  justify-content: center;
+  padding: 9px 10px;
   font-size: 0.85rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  color: var(--ink);
 }
 
-.dashboard-factoring-linha:not(.dashboard-factoring-cabecalho):hover {
-  background: #f8f8ff;
+.factoring-celula-nome {
+  justify-content: flex-start;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
 }
 
-.dashboard-factoring-cabecalho {
+.factoring-th {
+  font-family: 'Inter', sans-serif;
   color: var(--muted);
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  padding-bottom: 10px;
 }
 
-.dashboard-factoring-nome {
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.dashboard-factoring-todas {
+.factoring-celula-todas {
   background: var(--brand-soft);
-  border-radius: 8px;
-  margin-bottom: 4px;
-}
-
-.dashboard-factoring-todas .dashboard-factoring-nome {
   color: var(--brand-dark);
 }
 
-.dashboard-factoring-linha span {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-family: 'IBM Plex Mono', monospace;
-  font-weight: 600;
+.factoring-celula-nome.factoring-celula-todas {
+  border-radius: 8px 0 0 8px;
 }
 
-.dashboard-factoring-linha small {
-  font-family: 'Inter', sans-serif;
-  font-weight: 500;
-  color: var(--muted);
-  font-size: 0.72rem;
+.factoring-celula-total.factoring-celula-todas {
+  border-radius: 0 8px 8px 0;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-badge b {
+  font-size: 0.85rem;
 }
 
 @media (max-width: 780px) {
-  .dashboard-factoring-linha {
-    grid-template-columns: 90px repeat(5, minmax(70px, 1fr));
+  .dashboard-factoring-tabela {
+    grid-template-columns: minmax(90px, 1fr) 56px repeat(4, minmax(92px, 1fr));
     font-size: 0.78rem;
     overflow-x: auto;
   }

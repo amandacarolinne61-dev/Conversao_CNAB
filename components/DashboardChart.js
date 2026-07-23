@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { supabaseBrowser } from '../lib/supabaseBrowserClient'
 
 function formatarMoeda(v) {
@@ -12,6 +12,15 @@ function formatarMoedaCompacta(v) {
   return formatarMoeda(n)
 }
 
+function hexParaRgba(hex, alpha) {
+  const h = hex.replace('#', '')
+  const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16)
+  const r = (n >> 16) & 255
+  const g = (n >> 8) & 255
+  const b = n & 255
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 const FACTORING_LABEL = {
   bancorp: 'BANCORP',
   titan: 'TITAN',
@@ -19,14 +28,21 @@ const FACTORING_LABEL = {
   apollo: 'APOLLO',
 }
 
-// Mesmas cores dos tiles de status acima ("estilo da primeira linha"), pra
-// as colunas Em aberto/Liquidado/Baixado/Falta baixar do painel por
-// factoring carregarem o mesmo significado de cor em vez de ficarem em
-// preto/cinza neutro.
-const COR_ABERTO = '#4b5563'
+const COR_NEUTRO = '#6b7280'
+const COR_ABERTO = '#2563eb'
 const COR_LIQUIDADO = '#15803d'
 const COR_BAIXADO = '#d97706'
-const COR_FALTA_BAIXAR = '#9d174d'
+const COR_FALTA_BAIXAR = '#dc2626'
+
+// Colunas de status do painel "Por factoring" - cor de cada uma é usada
+// tanto na faixa de fundo quanto no badge dentro da célula, pra manter o
+// mesmo significado de cor em toda a coluna.
+const COLUNAS_STATUS = [
+  { chave: 'aberto', rotulo: 'Em aberto', cor: COR_ABERTO, col: 3 },
+  { chave: 'liquidado', rotulo: 'Liquidado', cor: COR_LIQUIDADO, col: 4 },
+  { chave: 'baixado', rotulo: 'Baixado', cor: COR_BAIXADO, col: 5 },
+  { chave: 'faltaBaixar', rotulo: 'Falta baixar', cor: COR_FALTA_BAIXAR, col: 6 },
+]
 
 function somarFactoring(lista) {
   return lista.reduce(
@@ -59,34 +75,38 @@ function somarFactoring(lista) {
   )
 }
 
-// Renderiza tanto a linha "Todas" quanto cada linha de factoring com a
-// mesma estrutura/estilo, só variando o destaque (fundo + rótulo em
-// negrito na de "Todas").
-function renderLinhaFactoring(nome, dados, destaque, key) {
+// Cada linha vira 6 células soltas (não uma div-linha), todas posicionadas
+// por gridRow/gridColumn explícitos - assim elas ficam no mesmo grid que as
+// faixas de fundo por coluna (que precisam de linhas/colunas explícitas pra
+// conseguir se sobrepor de propósito, cobrindo cabeçalho + todas as linhas).
+function renderLinhaFactoring(rowIndex, nome, dados, destaque, key) {
   return (
-    <div
-      key={key || nome}
-      className={`dashboard-factoring-linha${destaque ? ' dashboard-factoring-todas' : ''}`}
-    >
-      <span className="dashboard-factoring-nome">{nome}</span>
-      <span>{dados.total}</span>
-      <span style={{ color: COR_ABERTO }}>
-        {dados.aberto.quantidade}
-        <small>{formatarMoedaCompacta(dados.aberto.valor)}</small>
-      </span>
-      <span style={{ color: COR_LIQUIDADO }}>
-        {dados.liquidado.quantidade}
-        <small>{formatarMoedaCompacta(dados.liquidado.valor)}</small>
-      </span>
-      <span style={{ color: COR_BAIXADO }}>
-        {dados.baixado.quantidade}
-        <small>{formatarMoedaCompacta(dados.baixado.valor)}</small>
-      </span>
-      <span style={{ color: COR_FALTA_BAIXAR }}>
-        {dados.faltaBaixar.quantidade}
-        <small>{formatarMoedaCompacta(dados.faltaBaixar.valor)}</small>
-      </span>
-    </div>
+    <Fragment key={key || nome}>
+      <div
+        className={`factoring-celula factoring-celula-nome${destaque ? ' factoring-celula-todas' : ''}`}
+        style={{ gridRow: rowIndex, gridColumn: 1 }}
+      >
+        {nome}
+      </div>
+      <div
+        className={`factoring-celula factoring-celula-total${destaque ? ' factoring-celula-todas' : ''}`}
+        style={{ gridRow: rowIndex, gridColumn: 2 }}
+      >
+        {dados.total}
+      </div>
+      {COLUNAS_STATUS.map(({ chave, cor, col }) => (
+        <div
+          key={chave}
+          className="factoring-celula factoring-celula-status"
+          style={{ gridRow: rowIndex, gridColumn: col }}
+        >
+          <span className="status-badge" style={{ background: cor }}>
+            <b>{dados[chave].quantidade}</b>
+            {formatarMoedaCompacta(dados[chave].valor)}
+          </span>
+        </div>
+      ))}
+    </Fragment>
   )
 }
 
@@ -143,6 +163,8 @@ export default function DashboardChart() {
   const emAberto = (porStatus.aguardando_retorno || 0) + (porStatus.confirmado || 0)
   const valorEmAberto = (valorPorStatus.aguardando_retorno || 0) + (valorPorStatus.confirmado || 0)
 
+  const factoringsOrdenados = Object.entries(porFactoring)
+
   return (
     <section className="dashboard">
       <div className="dashboard-header">
@@ -162,36 +184,78 @@ export default function DashboardChart() {
 
       <div className="dashboard-hero">
         <div className="dashboard-hero-item">
-          <span className="dashboard-hero-valor">{total}</span>
+          <span
+            className="dashboard-pill"
+            style={{ background: hexParaRgba(COR_NEUTRO, 0.1), color: COR_NEUTRO }}
+          >
+            {total}
+          </span>
           <span className="dashboard-hero-rotulo">título(s) monitorado(s)</span>
         </div>
         <div className="dashboard-hero-divisor" />
         <div className="dashboard-hero-item">
-          <span className="dashboard-hero-valor">{formatarMoeda(valorTotal)}</span>
+          <span
+            className="dashboard-pill"
+            style={{ background: hexParaRgba(COR_ABERTO, 0.1), color: COR_ABERTO }}
+          >
+            {formatarMoeda(valorTotal)}
+          </span>
           <span className="dashboard-hero-rotulo">valor total em carteira</span>
         </div>
         <div className="dashboard-hero-divisor" />
         <div className="dashboard-hero-item">
-          <span className="dashboard-hero-valor">{formatarMoeda(valorEmAberto)}</span>
+          <span
+            className="dashboard-pill"
+            style={{ background: hexParaRgba(COR_ABERTO, 0.1), color: COR_ABERTO }}
+          >
+            {formatarMoeda(valorEmAberto)}
+          </span>
           <span className="dashboard-hero-rotulo">{emAberto} em aberto (aguardando/confirmado)</span>
         </div>
       </div>
 
-      {Object.keys(porFactoring).length > 0 && (
+      {factoringsOrdenados.length > 0 && (
         <div className="dashboard-factoring">
           <h3>Por factoring</h3>
           <div className="dashboard-factoring-tabela">
-            <div className="dashboard-factoring-linha dashboard-factoring-cabecalho">
-              <span style={{ color: 'var(--brand-dark)' }}>Factoring</span>
-              <span style={{ color: 'var(--ink)' }}>Total</span>
-              <span style={{ color: COR_ABERTO }}>Em aberto</span>
-              <span style={{ color: COR_LIQUIDADO }}>Liquidado</span>
-              <span style={{ color: COR_BAIXADO }}>Baixado</span>
-              <span style={{ color: COR_FALTA_BAIXAR }}>Falta baixar</span>
+            {COLUNAS_STATUS.map(({ chave, cor, col }) => (
+              <div
+                key={`banda-${chave}`}
+                className="factoring-banda"
+                style={{
+                  gridRow: '1 / -1',
+                  gridColumn: col,
+                  background: hexParaRgba(cor, 0.06),
+                  boxShadow: `inset 0 0 0 1px ${hexParaRgba(cor, 0.25)}`,
+                }}
+              />
+            ))}
+
+            <div
+              className="factoring-celula factoring-th factoring-celula-nome"
+              style={{ gridRow: 1, gridColumn: 1 }}
+            >
+              Factoring
             </div>
-            {renderLinhaFactoring('Todas', somarFactoring(Object.values(porFactoring)), true)}
-            {Object.entries(porFactoring).map(([chave, dados]) =>
-              renderLinhaFactoring(FACTORING_LABEL[chave] || chave, dados, false, chave)
+            <div
+              className="factoring-celula factoring-th factoring-celula-total"
+              style={{ gridRow: 1, gridColumn: 2 }}
+            >
+              Total
+            </div>
+            {COLUNAS_STATUS.map(({ chave, rotulo, cor, col }) => (
+              <div
+                key={chave}
+                className="factoring-celula factoring-th factoring-celula-status"
+                style={{ gridRow: 1, gridColumn: col, color: cor }}
+              >
+                {rotulo}
+              </div>
+            ))}
+
+            {renderLinhaFactoring(2, 'Todas', somarFactoring(Object.values(porFactoring)), true)}
+            {factoringsOrdenados.map(([chave, dados], i) =>
+              renderLinhaFactoring(i + 3, FACTORING_LABEL[chave] || chave, dados, false, chave)
             )}
           </div>
         </div>
