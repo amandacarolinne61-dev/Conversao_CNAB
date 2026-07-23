@@ -41,7 +41,7 @@ create table if not exists titulos (
   numero_titulo text,
   -- Linhas brutas originais (400 posições) do título na remessa: o registro
   -- tipo 1 (detalhe) e o tipo 5 que sempre vem logo depois dele (mensagem/
-  -- endereço - confirmado byte a byte em CB210704.TXT, par 1-5 pra cada
+  -- endereço - confirmado byte a byte em remessa_sistemaG3.TXT, par 1-5 pra cada
   -- título, sem exceção). Guardadas pra permitir reenviar o título depois
   -- byte-idêntico ao que já foi validado, sem reconstruir do layout oficial.
   -- Só existe pra títulos enviados a partir dessa coluna existir.

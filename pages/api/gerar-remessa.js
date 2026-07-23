@@ -16,7 +16,7 @@ import { supabase } from '../../lib/supabaseClient'
 // do header e o sequencial de registro (posição 394-400) de cada linha são
 // reescritos. Isso evita reconstruir uma linha de remessa do zero a partir
 // do layout oficial, que esse projeto nunca validou byte a byte (diferente
-// do que já foi confirmado contra arquivos reais como CB210704.TXT).
+// do que já foi confirmado contra arquivos reais como remessa_sistemaG3.TXT).
 //
 // Só funciona pra títulos enviados depois que essas colunas passaram a
 // existir - títulos mais antigos não têm a linha bruta guardada e não podem

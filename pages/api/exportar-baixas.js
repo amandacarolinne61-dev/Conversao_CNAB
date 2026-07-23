@@ -2,7 +2,7 @@ import { supabase } from '../../lib/supabaseClient'
 
 // Gerador do .RET de baixas, no MESMO layout confirmado do arquivo
 // CB170707_RETORNO_SIMULADO.RET (validado byte a byte contra o retorno real
-// da Bancorp em 341RETCLI...RET - as posições de nosso_numero, ocorrencia,
+// da Bancorp em retorno_bankorp.RET - as posições de nosso_numero, ocorrencia,
 // valor, datas e sacado são as MESMAS em ambos, o que confirma que esse é o
 // layout padrão de RETORNO usado pelo sistema/G3, independente da factoring
 // de origem).
@@ -79,7 +79,7 @@ export const config = {
   api: { bodyParser: { sizeLimit: '5mb' } },
 }
 
-// Templates baseados em LINHAS REAIS do retorno da Bancorp (341RETCLI...RET,
+// Templates baseados em LINHAS REAIS do retorno da Bancorp (retorno_bankorp.RET,
 // já processado com sucesso antes) - não mais no exemplo antigo da ZPEL, que
 // deixava caracteres residuais de outro layout (ex: um "E" sobrando na
 // posição 107, onde o arquivo real tem espaço em branco).
