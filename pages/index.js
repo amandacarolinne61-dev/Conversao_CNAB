@@ -30,6 +30,7 @@ export default function Home() {
   const [carregando, setCarregando] = useState(false)
   const [mensagem, setMensagem] = useState(null)
   const [selecionados, setSelecionados] = useState(() => new Set())
+  const [factoring, setFactoring] = useState('bancorp')
 
   const carregarTitulos = useCallback(async () => {
     const resp = await fetch('/api/titulos')
@@ -75,27 +76,16 @@ export default function Home() {
     setMensagem(null)
     try {
       const conteudo = await lerArquivoComoLatin1(file)
-      const resp = await fetch('/api/upload-retorno', {
+      const endpoint = factoring === 'titan' ? '/api/upload-retorno-titan' : '/api/upload-retorno'
+      const resp = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conteudo, nomeArquivo: file.name }),
       })
       const data = await resp.json()
       if (!resp.ok) throw new Error(data.error)
-      const naoEncontrados = data.resultado.filter((r) => !r.encontrado && !r.ambiguo).length
-      const ambiguos = data.titulosAmbiguos || []
-      setMensagem({
-        tipo: ambiguos.length > 0 ? 'aviso' : 'ok',
-        texto: `Retorno processado: ${data.resultado.length} movimento(s)${
-          naoEncontrados ? `, ${naoEncontrados} sem título correspondente` : ''
-        }${
-          ambiguos.length > 0
-            ? `. ⚠️ ${ambiguos.length} com número de título duplicado, não vinculados automaticamente: ${ambiguos
-                .map((a) => a.numeroTitulo)
-                .join(', ')} — resolva manualmente.`
-            : '.'
-        }`,
-      })
+      const temAviso = (data.titulosAmbiguos || []).length > 0 || (data.naoConciliados || []).length > 0
+      setMensagem({ tipo: temAviso ? 'aviso' : 'ok', texto: data.resumo })
       carregarTitulos()
     } catch (err) {
       setMensagem({ tipo: 'erro', texto: err.message })
@@ -144,11 +134,20 @@ export default function Home() {
           <input type="file" onChange={handleUploadRemessa} disabled={carregando} />
         </label>
 
-        <label className="card upload-card">
+        <div className="card upload-card">
           <span className="card-titulo">Enviar retorno</span>
-          <span className="card-desc">Arquivo recebido da factoring (ex: Bancorp)</span>
+          <span className="card-desc">Arquivo recebido da factoring</span>
+          <select
+            className="select-factoring"
+            value={factoring}
+            onChange={(e) => setFactoring(e.target.value)}
+            disabled={carregando}
+          >
+            <option value="bancorp">Bancorp (CNAB 400)</option>
+            <option value="titan">Titan (CSV)</option>
+          </select>
           <input type="file" onChange={handleUploadRetorno} disabled={carregando} />
-        </label>
+        </div>
 
         <a className="card upload-card" href="/api/exportar-baixas" style={{ textDecoration: 'none' }}>
           <span className="card-titulo">Exportar baixas</span>
@@ -187,6 +186,7 @@ export default function Home() {
               </th>
               <th>Nosso Número</th>
               <th>Seu Número</th>
+              <th>Banco/Portador</th>
               <th>Sacado</th>
               <th>Valor</th>
               <th>Valor Pago</th>
@@ -221,6 +221,7 @@ export default function Home() {
                   </td>
                   <td>{t.nosso_numero}</td>
                   <td>{t.seu_numero}</td>
+                  <td>{t.remessas?.portador_nome || '—'}</td>
                   <td>{t.nome_sacado}</td>
                   <td>{formatarMoeda(valorTitulo)}</td>
                   <td>{valorPago != null ? formatarMoeda(valorPago) : '—'}</td>
@@ -239,7 +240,7 @@ export default function Home() {
             })}
             {titulos.length === 0 && (
               <tr>
-                <td colSpan={10} className="vazio">
+                <td colSpan={11} className="vazio">
                   Nenhum título ainda. Envie uma remessa pra começar.
                 </td>
               </tr>

@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   try {
     const { data: titulos, error } = await supabase
       .from('titulos')
-      .select('*, movimentos_retorno(*)')
+      .select('*, movimentos_retorno(*), remessas(portador_codigo, portador_nome)')
       .order('criado_em', { ascending: false })
       .limit(200)
 
