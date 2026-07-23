@@ -171,34 +171,24 @@ export default function DashboardChart() {
             <div
               key={s.chave}
               className="dashboard-tile"
-              style={{ background: s.bg }}
               title={`${quantidade} título(s) · ${formatarMoeda(valor)}`}
             >
-              <div className="dashboard-tile-topo">
-                <svg
-                  className="dashboard-tile-icone"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  style={{ color: s.tx }}
-                >
-                  <path
-                    d={s.icone}
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span className="dashboard-tile-rotulo" style={{ color: s.tx }}>
-                  {s.texto}
-                </span>
-              </div>
-              <div className="dashboard-tile-numeros">
-                <span className="dashboard-tile-quantidade" style={{ color: s.tx }}>
-                  {quantidade}
-                </span>
-                <span className="dashboard-tile-valor">{formatarMoedaCompacta(valor)}</span>
-              </div>
+              <svg className="dashboard-tile-icone" viewBox="0 0 24 24" fill="none" style={{ color: s.tx }}>
+                <path
+                  d={s.icone}
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span className="dashboard-tile-rotulo" style={{ color: s.tx }}>
+                {s.texto}
+              </span>
+              <span className="dashboard-tile-quantidade" style={{ color: s.tx }}>
+                {quantidade}
+              </span>
+              <span className="dashboard-tile-valor">{formatarMoedaCompacta(valor)}</span>
             </div>
           )
         })}
