@@ -23,6 +23,10 @@ export default async function handler(req, res) {
     }
 
     // --- Duplicidade: algum Nosso Número desse arquivo já existe no sistema? ---
+    // Diferente do comportamento antigo (bloqueava o arquivo inteiro se
+    // achasse qualquer duplicata), agora os títulos novos são gravados
+    // normalmente e só os duplicados ficam de fora, avisados na resposta -
+    // não trava mais o upload inteiro por causa de alguns repetidos.
     const nossosNumeros = titulos.map((t) => t.nossoNumero).filter(Boolean)
 
     const { data: titulosExistentes, error: erroChecagem } = await supabase
@@ -32,18 +36,22 @@ export default async function handler(req, res) {
 
     if (erroChecagem) throw erroChecagem
 
-    if (titulosExistentes && titulosExistentes.length > 0) {
-      const lista = titulosExistentes
-        .slice(0, 10)
-        .map((t) => `${t.nosso_numero} (${t.seu_numero || 's/ nº'} - ${t.nome_sacado || ''})`)
-        .join('; ')
+    const nossosNumerosExistentes = new Set((titulosExistentes || []).map((t) => t.nosso_numero))
+    const titulosNovos = titulos.filter((t) => !nossosNumerosExistentes.has(t.nossoNumero))
 
-      return res.status(409).json({
-        error: `⚠️ ${titulosExistentes.length} título(s) já existem no sistema e não foram gravados de novo: ${lista}${
-          titulosExistentes.length > 10 ? '...' : ''
-        }`,
-        tipo: 'titulos_duplicados',
-        duplicados: titulosExistentes.map((t) => t.nosso_numero),
+    const duplicados = (titulosExistentes || []).map((t) => ({
+      nossoNumero: t.nosso_numero,
+      seuNumero: t.seu_numero,
+      nomeSacado: t.nome_sacado,
+    }))
+
+    if (titulosNovos.length === 0) {
+      return res.status(200).json({
+        ok: true,
+        remessaId: null,
+        quantidadeTitulos: 0,
+        duplicados,
+        aviso: `⚠️ Todos os ${duplicados.length} título(s) do arquivo já existiam no sistema - nenhum título novo foi gravado.`,
       })
     }
 
@@ -55,7 +63,7 @@ export default async function handler(req, res) {
         // lido do cabeçalho da remessa - é esse código+nome que deve
         // aparecer no .RET de saída, não o do retorno da factoring.
         portador_nome: portadorNome || cabecalho.portadorNome || null,
-        cnpj_cedente: titulos[0].cnpjCedente,
+        cnpj_cedente: titulosNovos[0].cnpjCedente,
         nome_empresa: cabecalho.nomeEmpresa,
         codigo_transmissao: cabecalho.codigoTransmissao,
         nome_arquivo: nomeArquivo || null,
@@ -67,7 +75,7 @@ export default async function handler(req, res) {
 
     if (erroRemessa) throw erroRemessa
 
-    const linhasTitulos = titulos.map((t) => ({
+    const linhasTitulos = titulosNovos.map((t) => ({
       remessa_id: remessa.id,
       nosso_numero: t.nossoNumero,
       seu_numero: t.seuNumero,
@@ -95,7 +103,15 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       remessaId: remessa.id,
-      quantidadeTitulos: titulos.length,
+      quantidadeTitulos: titulosNovos.length,
+      duplicados,
+      aviso:
+        duplicados.length > 0
+          ? `⚠️ ${duplicados.length} título(s) já existiam no sistema e não foram gravados de novo: ${duplicados
+              .slice(0, 10)
+              .map((d) => `${d.nossoNumero} (${d.seuNumero || 's/ nº'} - ${d.nomeSacado || ''})`)
+              .join('; ')}${duplicados.length > 10 ? '...' : ''}`
+          : null,
     })
   } catch (err) {
     console.error(err)

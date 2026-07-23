@@ -55,7 +55,10 @@ export default function Home() {
       })
       const data = await resp.json()
       if (!resp.ok) throw new Error(data.error)
-      setMensagem({ tipo: 'ok', texto: `Remessa gravada: ${data.quantidadeTitulos} título(s).` })
+      setMensagem({
+        tipo: data.aviso ? 'aviso' : 'ok',
+        texto: `${data.quantidadeTitulos} título(s) gravado(s).${data.aviso ? ' ' + data.aviso : ''}`,
+      })
       carregarTitulos()
     } catch (err) {
       setMensagem({ tipo: 'erro', texto: err.message })
