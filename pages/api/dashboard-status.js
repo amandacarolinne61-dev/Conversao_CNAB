@@ -1,5 +1,14 @@
 import { supabase } from '../../lib/supabaseClient'
 
+// Data de hoje (YYYY-MM-DD) no fuso de Brasília, derivada do instante atual
+// (não de uma string de data já salva - por isso não cai no mesmo problema
+// de "new Date(iso)" documentado no README/CLAUDE.md pra datas de CNAB).
+function hojeISOBrasil() {
+  const agora = new Date()
+  const brasilia = new Date(agora.getTime() - 3 * 60 * 60 * 1000)
+  return brasilia.toISOString().slice(0, 10)
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Método não permitido' })
@@ -23,7 +32,7 @@ export default async function handler(req, res) {
     // server-side o tempo todo (ver lib/supabaseClient.js).
     const { data: titulosValores, error: erroValores } = await supabase
       .from('titulos')
-      .select('status, valor_titulo, remessa_id, exportado_em')
+      .select('status, valor_titulo, remessa_id, exportado_em, data_vencimento')
 
     if (erroValores) throw erroValores
 
@@ -49,9 +58,11 @@ export default async function handler(req, res) {
     )
 
     const ABERTO = new Set(['aguardando_retorno', 'confirmado', 'ver_manual'])
+    const hojeISO = hojeISOBrasil()
     const vazioFactoring = () => ({
       total: 0,
       aberto: { quantidade: 0, valor: 0 },
+      vencido: { quantidade: 0, valor: 0 },
       liquidado: { quantidade: 0, valor: 0 },
       faltaBaixar: { quantidade: 0, valor: 0 },
     })
@@ -65,8 +76,16 @@ export default async function handler(req, res) {
 
       grupo.total++
       if (ABERTO.has(t.status)) {
-        grupo.aberto.quantidade++
-        grupo.aberto.valor += valor
+        // Vencido = ainda aberto (sem confirmação de liquidação) e com
+        // vencimento já passado - sai da contagem de "aberto" (mutuamente
+        // exclusivo), não some da conta: aberto + vencido = total em aberto.
+        if (t.data_vencimento && t.data_vencimento < hojeISO) {
+          grupo.vencido.quantidade++
+          grupo.vencido.valor += valor
+        } else {
+          grupo.aberto.quantidade++
+          grupo.aberto.valor += valor
+        }
       }
       if (t.status === 'liquidado') {
         grupo.liquidado.quantidade++

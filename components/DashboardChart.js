@@ -30,16 +30,22 @@ const FACTORING_LABEL = {
 
 const COR_NEUTRO = '#6b7280'
 const COR_ABERTO = '#2563eb'
+const COR_VENCIDO = '#0891b2'
 const COR_LIQUIDADO = '#15803d'
 const COR_FALTA_BAIXAR = '#dc2626'
 
 // Colunas de status do painel "Por factoring" - cor de cada uma é usada
 // tanto na faixa de fundo quanto no badge dentro da célula, pra manter o
-// mesmo significado de cor em toda a coluna.
+// mesmo significado de cor em toda a coluna. Cor do "vencido" (ciano) foi
+// escolhida com scripts/validate_palette.js (skill de dataviz) - várias
+// opções de laranja/marrom testadas contra as outras 4 cores falharam o
+// piso de visão normal por ficarem perto demais do vermelho, só o ciano
+// passou em todos os checks.
 const COLUNAS_STATUS = [
-  { chave: 'aberto', rotulo: 'Em aberto', cor: COR_ABERTO, col: 3 },
-  { chave: 'liquidado', rotulo: 'Liquidado', cor: COR_LIQUIDADO, col: 4 },
-  { chave: 'faltaBaixar', rotulo: 'Falta baixar', cor: COR_FALTA_BAIXAR, col: 5 },
+  { chave: 'aberto', rotulo: 'Aguardando retorno', cor: COR_ABERTO, col: 3 },
+  { chave: 'vencido', rotulo: 'Vencidos', cor: COR_VENCIDO, col: 4 },
+  { chave: 'liquidado', rotulo: 'Liquidado', cor: COR_LIQUIDADO, col: 5 },
+  { chave: 'faltaBaixar', rotulo: 'Falta baixar', cor: COR_FALTA_BAIXAR, col: 6 },
 ]
 
 function somarFactoring(lista) {
@@ -49,6 +55,10 @@ function somarFactoring(lista) {
       aberto: {
         quantidade: soma.aberto.quantidade + d.aberto.quantidade,
         valor: soma.aberto.valor + d.aberto.valor,
+      },
+      vencido: {
+        quantidade: soma.vencido.quantidade + d.vencido.quantidade,
+        valor: soma.vencido.valor + d.vencido.valor,
       },
       liquidado: {
         quantidade: soma.liquidado.quantidade + d.liquidado.quantidade,
@@ -62,6 +72,7 @@ function somarFactoring(lista) {
     {
       total: 0,
       aberto: { quantidade: 0, valor: 0 },
+      vencido: { quantidade: 0, valor: 0 },
       liquidado: { quantidade: 0, valor: 0 },
       faltaBaixar: { quantidade: 0, valor: 0 },
     }

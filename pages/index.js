@@ -54,6 +54,24 @@ function elegivelRemessa(t) {
   return t.status === 'liquidado' || t.status === 'baixado'
 }
 
+// Data de hoje (YYYY-MM-DD) no fuso de Brasília, derivada do instante atual
+// (não de uma string de data já salva - por isso não cai no mesmo problema
+// de "new Date(iso)" que formatarData evita acima).
+function hojeISOBrasil() {
+  const agora = new Date()
+  const brasilia = new Date(agora.getTime() - 3 * 60 * 60 * 1000)
+  return brasilia.toISOString().slice(0, 10)
+}
+
+// "Vencido" não é um status real gravado em titulos.status (esse continua
+// vindo só do código de ocorrência do retorno - ver CLAUDE.md) - é derivado
+// aqui na tela comparando vencimento com hoje, só pros status ainda em
+// aberto (que não tiveram confirmação de liquidação).
+const STATUS_ABERTOS = new Set(['aguardando_retorno', 'confirmado', 'ver_manual'])
+function estaVencido(t, hojeISO) {
+  return STATUS_ABERTOS.has(t.status) && !!t.data_vencimento && t.data_vencimento < hojeISO
+}
+
 const STATUS_LABEL = {
   aguardando_retorno: { texto: 'Aguardando retorno', bg: 'var(--cor-neutro-bg)', tx: 'var(--cor-neutro-tx)' },
   liquidado: { texto: 'Liquidado', bg: 'var(--cor-verde-bg)', tx: 'var(--cor-verde-tx)' },
@@ -63,6 +81,8 @@ const STATUS_LABEL = {
   baixa_rejeitada: { texto: 'Baixa rejeitada', bg: 'var(--cor-vermelho-bg)', tx: 'var(--cor-vermelho-tx)' },
   ver_manual: { texto: 'Ver manual', bg: 'var(--cor-ambar-bg)', tx: 'var(--cor-ambar-tx)' },
 }
+
+const STATUS_VENCIDO = { texto: 'Vencido', bg: 'var(--cor-ciano-bg)', tx: 'var(--cor-ciano-tx)' }
 
 export default function Home() {
   const [titulos, setTitulos] = useState([])
@@ -91,8 +111,11 @@ export default function Home() {
 
   const temFiltroAtivo = Object.values(filtros).some(Boolean)
 
+  const hojeISO = hojeISOBrasil()
+
   // Filtro por coluna - cada campo de texto compara substring sem
-  // diferenciar maiúsc.; Status é seleção exata. Aplicado no que já está
+  // diferenciar maiúsc.; Status é seleção exata (com "vencido" tratado à
+  // parte, por ser derivado e não um status real). Aplicado no que já está
   // carregado (sem chamada nova ao servidor).
   const titulosFiltrados = titulos.filter((t) => {
     const { valorTitulo, valorPago, diferenca, ultimoMov } = derivarTitulo(t)
@@ -109,7 +132,8 @@ export default function Home() {
       contem(filtros.valorPago, valorPago != null ? formatarMoeda(valorPago) : '') &&
       contem(filtros.diferenca, diferenca != null ? formatarMoeda(diferenca) : '') &&
       contem(filtros.vencimento, formatarData(t.data_vencimento)) &&
-      (!filtros.status || t.status === filtros.status) &&
+      (!filtros.status ||
+        (filtros.status === 'vencido' ? estaVencido(t, hojeISO) : t.status === filtros.status)) &&
       contem(filtros.ultimaOcorrencia, ultimoMov ? ultimoMov.ocorrencia_descricao : '')
     )
   })
@@ -232,7 +256,7 @@ export default function Home() {
     }
 
     const linhas = titulosFiltrados.map((t) => {
-      const status = STATUS_LABEL[t.status] || { texto: t.status }
+      const status = estaVencido(t, hojeISO) ? STATUS_VENCIDO : STATUS_LABEL[t.status] || { texto: t.status }
       const { valorTitulo, valorPago, diferenca, ultimoMov } = derivarTitulo(t)
 
       return [
@@ -503,6 +527,7 @@ export default function Home() {
               <th>
                 <select value={filtros.status} onChange={(e) => atualizarFiltro('status', e.target.value)}>
                   <option value="">todos</option>
+                  <option value="vencido">{STATUS_VENCIDO.texto}</option>
                   {Object.entries(STATUS_LABEL).map(([valor, info]) => (
                     <option key={valor} value={valor}>
                       {info.texto}
@@ -522,11 +547,13 @@ export default function Home() {
           </thead>
           <tbody>
             {titulosFiltrados.map((t) => {
-              const status = STATUS_LABEL[t.status] || {
-                texto: t.status,
-                bg: 'var(--cor-neutro-bg)',
-                tx: 'var(--cor-neutro-tx)',
-              }
+              const status = estaVencido(t, hojeISO)
+                ? STATUS_VENCIDO
+                : STATUS_LABEL[t.status] || {
+                    texto: t.status,
+                    bg: 'var(--cor-neutro-bg)',
+                    tx: 'var(--cor-neutro-tx)',
+                  }
               const { ultimoMov, valorTitulo, valorPago, diferenca } = derivarTitulo(t)
               const temDiferenca = diferenca != null && Math.abs(diferenca) > 0.005
               return (
