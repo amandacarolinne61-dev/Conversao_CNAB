@@ -503,7 +503,7 @@ export default function Home() {
               const { ultimoMov, valorTitulo, valorPago, diferenca } = derivarTitulo(t)
               const temDiferenca = diferenca != null && Math.abs(diferenca) > 0.005
               return (
-                <tr key={t.id}>
+                <tr key={t.id} style={{ background: status.bg }}>
                   <td>
                     <input
                       type="checkbox"
@@ -524,7 +524,7 @@ export default function Home() {
                   </td>
                   <td>{formatarData(t.data_vencimento)}</td>
                   <td>
-                    <span className="status-pill" style={{ background: status.bg, color: status.tx }}>
+                    <span className="status-pill" style={{ background: status.tx, color: '#fff' }}>
                       {status.texto}
                     </span>
                   </td>

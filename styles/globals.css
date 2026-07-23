@@ -238,11 +238,11 @@ tbody td {
 tbody tr:last-child td { border-bottom: none; }
 
 tbody tr {
-  transition: background 0.12s ease;
+  transition: filter 0.12s ease;
 }
 
 tbody tr:hover {
-  background: #f8f8ff;
+  filter: brightness(0.96);
 }
 
 td:nth-child(2), td:nth-child(3) {
