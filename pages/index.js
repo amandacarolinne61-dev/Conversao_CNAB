@@ -286,6 +286,8 @@ export default function Home() {
           >
             <option value="bancorp">Bancorp</option>
             <option value="titan">Titan</option>
+            <option value="baltic">Baltic</option>
+            <option value="apollo">Apollo</option>
           </select>
           <input type="file" onChange={handleUploadRemessa} disabled={carregando} />
         </div>

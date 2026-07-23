@@ -69,7 +69,8 @@ import { supabase } from '../../lib/supabaseClient'
 // diferente entre títulos diferentes.
 //
 // Header:
-//   76-79   código do banco/portador
+//   76-79   código do banco/portador (ver MAPA_CODIGO_EXPORTACAO_BAIXA -
+//           esse código é por FACTORING, não o portador_codigo do CNAB)
 //   94-100  data de geração (DDMMAA)
 //   108-113 sequencial do arquivo (5 dígitos)
 //   113-119 data de geração repetida (DDMMAA)
@@ -134,11 +135,26 @@ function formatarTituloG3(t) {
   return '0'.repeat(10 - s.length) + s
 }
 
+// Código do banco/portador (posição 76-79 do header, 3 dígitos) exigido
+// pelo G3 pra exportação de baixas - varia pela FACTORING de origem do
+// título (`remessas.factoring`), não pelo portador_codigo do CNAB da
+// remessa (esse continua sendo só o banco por onde a remessa foi
+// transmitida, campo diferente). "bancorp" é o nome usado em todo o
+// resto do projeto (remessas.factoring, seletor de factoring na tela) -
+// grafado aqui do mesmo jeito, ainda que a factoring já tenha aparecido
+// escrita "Bankorp" numa mensagem.
+const MAPA_CODIGO_EXPORTACAO_BAIXA = {
+  titan: '988',
+  baltic: '989',
+  apollo: '991',
+  bancorp: '994',
+}
+
 export default async function handler(req, res) {
   try {
     const { data: titulos, error } = await supabase
       .from('titulos')
-      .select('*, movimentos_retorno(*), remessas(portador_codigo, portador_nome, nome_empresa)')
+      .select('*, movimentos_retorno(*), remessas(portador_codigo, portador_nome, nome_empresa, factoring)')
       .eq('status', 'liquidado')
       .is('exportado_em', null)
 
@@ -156,13 +172,18 @@ export default async function handler(req, res) {
     // código do SEU sistema, ex "777"/"BANCO TESTE") - nunca do retorno da
     // factoring. Assume-se que todos os títulos exportados juntos são do
     // mesmo portador; se um dia isso não for verdade, essa exportação
-    // precisará ser feita em lotes separados por portador.
+    // precisará ser feita em lotes separados por portador. A mesma
+    // suposição vale agora pra factoring - o código escrito na posição
+    // 76-79 é o da factoring do PRIMEIRO título (ver
+    // MAPA_CODIGO_EXPORTACAO_BAIXA acima).
     const remessaRef = titulos[0].remessas || {}
+    const codigoExportacao =
+      MAPA_CODIGO_EXPORTACAO_BAIXA[remessaRef.factoring] || remessaRef.portador_codigo || '000'
 
     // --- Header ---
     let header = HEADER_TEMPLATE
     header = setAt(header, 46, padDireita((remessaRef.nome_empresa || '').toUpperCase(), 30))
-    header = setAt(header, 76, pad(remessaRef.portador_codigo || '000', 3, '0'))
+    header = setAt(header, 76, pad(codigoExportacao, 3, '0'))
     header = setAt(header, 79, padDireita((remessaRef.portador_nome || '').toUpperCase(), 15))
     header = setAt(header, 94, dataHoje) // data de geração
     header = setAt(header, 108, pad(1, 5)) // sequencial do arquivo

@@ -5,6 +5,12 @@ export const config = {
   api: { bodyParser: { sizeLimit: '5mb' } },
 }
 
+// Factorings conhecidas hoje - qualquer outro valor (ou ausência de valor)
+// cai em 'bancorp', a mesma que já era a única opção antes desse campo
+// existir. Mantido em sincronia com o seletor "Enviar remessa" em
+// pages/index.js e com MAPA_CODIGO_EXPORTACAO_BAIXA em exportar-baixas.js.
+const FACTORINGS_VALIDAS = ['bancorp', 'titan', 'baltic', 'apollo']
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método não permitido' })
@@ -73,7 +79,7 @@ export default async function handler(req, res) {
         // o casamento em upload-retorno.js/upload-retorno-titan.js pra só
         // considerar títulos da mesma factoring (ver comentário em
         // schema.sql sobre `remessas.factoring`).
-        factoring: factoring === 'titan' ? 'titan' : 'bancorp',
+        factoring: FACTORINGS_VALIDAS.includes(factoring) ? factoring : 'bancorp',
       })
       .select()
       .single()
