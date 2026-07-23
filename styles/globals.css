@@ -219,15 +219,43 @@ h2 {
 
 table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   background: var(--panel);
   border: 1px solid var(--border);
   font-size: 0.87rem;
 }
 
+/* Larguras fixas por coluna (checkbox fica de fora - tem width própria
+   fixa em td:first-child - o resto soma 100%). Sem isso, colunas com
+   texto comprido esticavam a tabela pra além do container em vez de
+   quebrar linha, cortando as últimas colunas da vista. */
+th:nth-child(2), td:nth-child(2) { width: 8%; }
+th:nth-child(3), td:nth-child(3) { width: 9%; }
+th:nth-child(4), td:nth-child(4) { width: 11%; }
+th:nth-child(5), td:nth-child(5) { width: 15%; }
+th:nth-child(6), td:nth-child(6) { width: 9%; }
+th:nth-child(7), td:nth-child(7) { width: 8%; }
+th:nth-child(8), td:nth-child(8) { width: 8%; }
+th:nth-child(9), td:nth-child(9) { width: 9%; }
+th:nth-child(10), td:nth-child(10) { width: 14%; }
+th:nth-child(11), td:nth-child(11) { width: 9%; }
+
+/* Só Sacado (5) e Última ocorrência (11) quebram linha (nomes/descrições
+   variam de tamanho); as demais colunas (código, valor, data, status)
+   nunca quebram no meio - a largura acima já foi calculada com folga
+   suficiente pro conteúdo real caber numa linha só. */
+tbody td {
+  white-space: nowrap;
+}
+
+td:nth-child(5), td:nth-child(11) {
+  white-space: normal;
+}
+
 thead th {
   text-align: left;
-  padding: 12px 14px;
+  padding: 12px 10px;
   background: #f8f8fc;
   color: var(--muted);
   font-weight: 700;
@@ -238,7 +266,7 @@ thead th {
 }
 
 tbody td {
-  padding: 11px 14px;
+  padding: 11px 10px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -306,7 +334,7 @@ input[type='checkbox']:disabled {
 
 /* --- Linha de filtro por coluna --- */
 .linha-filtros th {
-  padding: 6px 10px 10px;
+  padding: 6px 6px 10px;
   background: #fafafd;
   border-bottom: 1px solid var(--border);
   font-weight: 400;
@@ -318,8 +346,8 @@ input[type='checkbox']:disabled {
   box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 5px 8px;
-  font-size: 0.78rem;
+  padding: 5px 6px;
+  font-size: 0.74rem;
   font-weight: 400;
   font-family: 'Inter', sans-serif;
   color: var(--ink);
