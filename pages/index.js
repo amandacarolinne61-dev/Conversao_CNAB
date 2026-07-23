@@ -19,6 +19,20 @@ function formatarMoeda(v) {
   return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
+const FACTORING_LABEL = {
+  bancorp: 'Bancorp',
+  titan: 'Titan',
+  baltic: 'Baltic',
+  apollo: 'Apollo',
+}
+
+// Nome da factoring escolhida no envio da remessa (não o banco/portador do
+// CNAB, que é outro campo - ver remessas.factoring em schema.sql).
+function nomeFactoring(t) {
+  const chave = t.remessas?.factoring
+  return chave ? FACTORING_LABEL[chave] || chave : '—'
+}
+
 // Deriva de cada título os campos calculados a partir de movimentos_retorno
 // (valor pago mais recente, diferença) - usado tanto pro filtro por coluna
 // quanto pra renderização da linha, pra não duplicar essa lógica em dois
@@ -82,7 +96,7 @@ export default function Home() {
     return (
       contem(filtros.nossoNumero, t.nosso_numero) &&
       contem(filtros.seuNumero, t.seu_numero) &&
-      contem(filtros.portador, t.remessas?.portador_nome) &&
+      contem(filtros.portador, nomeFactoring(t)) &&
       contem(filtros.sacado, t.nome_sacado) &&
       contem(filtros.valor, formatarMoeda(valorTitulo)) &&
       contem(filtros.valorPago, valorPago != null ? formatarMoeda(valorPago) : '') &&
@@ -193,7 +207,7 @@ export default function Home() {
     const colunas = [
       'Nosso Número',
       'Seu Número',
-      'Banco/Portador',
+      'Factoring',
       'Sacado',
       'CNPJ/CPF Sacado',
       'Valor Título',
@@ -217,7 +231,7 @@ export default function Home() {
       return [
         t.nosso_numero,
         t.seu_numero,
-        t.remessas?.portador_nome || '',
+        nomeFactoring(t),
         t.nome_sacado,
         t.cnpj_sacado,
         valorTitulo.toFixed(2).replace('.', ','),
@@ -404,7 +418,7 @@ export default function Home() {
               </th>
               <th>Nosso Número</th>
               <th>Seu Número</th>
-              <th>Banco/Portador</th>
+              <th>Factoring</th>
               <th>Sacado</th>
               <th>Valor</th>
               <th>Valor Pago</th>
@@ -521,7 +535,7 @@ export default function Home() {
                   </td>
                   <td>{t.nosso_numero}</td>
                   <td>{t.seu_numero}</td>
-                  <td>{t.remessas?.portador_nome || '—'}</td>
+                  <td>{nomeFactoring(t)}</td>
                   <td>{t.nome_sacado}</td>
                   <td>{formatarMoeda(valorTitulo)}</td>
                   <td>{valorPago != null ? formatarMoeda(valorPago) : '—'}</td>
