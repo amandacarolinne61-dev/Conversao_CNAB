@@ -384,6 +384,7 @@ export default function Home() {
             </button>
           </div>
         </div>
+        <div className="tabela-scroll">
         <table>
           <thead>
             <tr>
@@ -546,6 +547,7 @@ export default function Home() {
             )}
           </tbody>
         </table>
+        </div>
       </section>
     </div>
   )

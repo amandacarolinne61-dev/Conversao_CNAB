@@ -207,15 +207,22 @@ h2 {
 }
 
 /* --- Tabela --- */
+/* A tabela de títulos ficou mais larga que o container (checkbox + 10
+   colunas + linha de filtros); sem isso, ela empurrava a PÁGINA INTEIRA pra
+   rolar na horizontal em vez de só ela mesma, fazendo o conteúdo parecer
+   "colado" à direita/fora do centro. */
+.tabela-scroll {
+  overflow-x: auto;
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  overflow: hidden;
   font-size: 0.87rem;
-  box-shadow: var(--shadow-sm);
 }
 
 thead th {
