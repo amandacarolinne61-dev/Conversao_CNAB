@@ -20,10 +20,10 @@ function formatarMoeda(v) {
 }
 
 const FACTORING_LABEL = {
-  bancorp: 'Bancorp',
-  titan: 'Titan',
-  baltic: 'Baltic',
-  apollo: 'Apollo',
+  bancorp: 'BANCORP',
+  titan: 'TITAN',
+  baltic: 'BALTIC',
+  apollo: 'APOLLO',
 }
 
 // Nome da factoring escolhida no envio da remessa (não o banco/portador do

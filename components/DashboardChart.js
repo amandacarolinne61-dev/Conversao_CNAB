@@ -13,10 +13,10 @@ function formatarMoedaCompacta(v) {
 }
 
 const FACTORING_LABEL = {
-  bancorp: 'Bancorp',
-  titan: 'Titan',
-  baltic: 'Baltic',
-  apollo: 'Apollo',
+  bancorp: 'BANCORP',
+  titan: 'TITAN',
+  baltic: 'BALTIC',
+  apollo: 'APOLLO',
 }
 
 // Mesmas cores dos tiles de status acima ("estilo da primeira linha"), pra
