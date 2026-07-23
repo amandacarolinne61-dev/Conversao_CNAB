@@ -32,6 +32,19 @@ export default function Home() {
   const [selecionados, setSelecionados] = useState(() => new Set())
   const [factoringRemessa, setFactoringRemessa] = useState('bancorp')
   const [factoringRetorno, setFactoringRetorno] = useState('bancorp')
+  const [filtro, setFiltro] = useState('')
+
+  // Filtro de pesquisa da tabela de títulos - busca por Nosso Número, Seu
+  // Número, sacado ou banco/portador, sem diferenciar maiúsc./acentos.
+  // Aplicado no que já está carregado (sem chamada nova ao servidor).
+  const filtroNormalizado = filtro.trim().toLowerCase()
+  const titulosFiltrados = filtroNormalizado
+    ? titulos.filter((t) =>
+        [t.nosso_numero, t.seu_numero, t.nome_sacado, t.remessas?.portador_nome]
+          .filter(Boolean)
+          .some((campo) => campo.toLowerCase().includes(filtroNormalizado))
+      )
+    : titulos
 
   const carregarTitulos = useCallback(async () => {
     const resp = await fetch('/api/titulos')
@@ -108,7 +121,8 @@ export default function Home() {
   function toggleSelecionarTodos() {
     // "Gerar remessa" só vale pra títulos liquidados - só esses entram no
     // "selecionar todos" (os demais nem têm checkbox marcável na linha).
-    const liquidados = titulos.filter((t) => t.status === 'liquidado')
+    // Considera só o que está visível no filtro atual.
+    const liquidados = titulosFiltrados.filter((t) => t.status === 'liquidado')
     setSelecionados((atual) =>
       liquidados.length > 0 && atual.size === liquidados.length
         ? new Set()
@@ -149,7 +163,7 @@ export default function Home() {
       return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
     }
 
-    const linhas = titulos.map((t) => {
+    const linhas = titulosFiltrados.map((t) => {
       const status = STATUS_LABEL[t.status] || { texto: t.status }
       const ultimoMov = (t.movimentos_retorno || []).sort((a, b) =>
         (b.data_ocorrencia || '').localeCompare(a.data_ocorrencia || '')
@@ -284,6 +298,28 @@ export default function Home() {
       <section>
         <div className="titulos-header">
           <h2>Títulos</h2>
+          <div className="titulos-header-busca">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <input
+              type="text"
+              placeholder="Buscar por nosso número, seu número, sacado ou banco..."
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
+            />
+            {filtro && (
+              <button className="btn-limpar-busca" onClick={() => setFiltro('')} title="Limpar busca">
+                ×
+              </button>
+            )}
+          </div>
           <div className="titulos-header-acoes">
             {selecionados.size > 0 && (
               <button className="btn-gerar-remessa" onClick={gerarRemessaSelecionados}>
@@ -293,7 +329,7 @@ export default function Home() {
             <button
               className="btn-exportar-excel"
               onClick={exportarExcel}
-              disabled={titulos.length === 0}
+              disabled={titulosFiltrados.length === 0}
             >
               <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
@@ -315,12 +351,12 @@ export default function Home() {
                 <input
                   type="checkbox"
                   checked={
-                    titulos.some((t) => t.status === 'liquidado') &&
-                    titulos.filter((t) => t.status === 'liquidado').every((t) => selecionados.has(t.id))
+                    titulosFiltrados.some((t) => t.status === 'liquidado') &&
+                    titulosFiltrados.filter((t) => t.status === 'liquidado').every((t) => selecionados.has(t.id))
                   }
                   onChange={toggleSelecionarTodos}
-                  disabled={!titulos.some((t) => t.status === 'liquidado')}
-                  title="Selecionar todos os títulos liquidados"
+                  disabled={!titulosFiltrados.some((t) => t.status === 'liquidado')}
+                  title="Selecionar todos os títulos liquidados (visíveis no filtro atual)"
                 />
               </th>
               <th>Nosso Número</th>
@@ -336,7 +372,7 @@ export default function Home() {
             </tr>
           </thead>
           <tbody>
-            {titulos.map((t) => {
+            {titulosFiltrados.map((t) => {
               const status = STATUS_LABEL[t.status] || {
                 texto: t.status,
                 bg: 'var(--cor-neutro-bg)',
@@ -381,10 +417,12 @@ export default function Home() {
                 </tr>
               )
             })}
-            {titulos.length === 0 && (
+            {titulosFiltrados.length === 0 && (
               <tr>
                 <td colSpan={11} className="vazio">
-                  Nenhum título ainda. Envie uma remessa pra começar.
+                  {titulos.length === 0
+                    ? 'Nenhum título ainda. Envie uma remessa pra começar.'
+                    : 'Nenhum título encontrado pra essa busca.'}
                 </td>
               </tr>
             )}
