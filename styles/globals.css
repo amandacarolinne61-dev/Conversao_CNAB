@@ -587,6 +587,16 @@ input[type='checkbox']:disabled {
   color: var(--ink);
 }
 
+.dashboard-factoring-todas {
+  background: var(--brand-soft);
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+
+.dashboard-factoring-todas .dashboard-factoring-nome {
+  color: var(--brand-dark);
+}
+
 .dashboard-factoring-linha span {
   display: flex;
   align-items: baseline;

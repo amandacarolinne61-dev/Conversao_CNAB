@@ -76,6 +76,77 @@ const FACTORING_LABEL = {
   titan: 'Titan',
 }
 
+// Mesmas cores dos tiles de status acima ("estilo da primeira linha"), pra
+// as colunas Em aberto/Liquidado/Baixado/Falta baixar do painel por
+// factoring carregarem o mesmo significado de cor em vez de ficarem em
+// preto/cinza neutro.
+const COR_ABERTO = '#4b5563'
+const COR_LIQUIDADO = '#15803d'
+const COR_BAIXADO = '#d97706'
+const COR_FALTA_BAIXAR = '#9d174d'
+
+function somarFactoring(lista) {
+  return lista.reduce(
+    (soma, d) => ({
+      total: soma.total + d.total,
+      aberto: {
+        quantidade: soma.aberto.quantidade + d.aberto.quantidade,
+        valor: soma.aberto.valor + d.aberto.valor,
+      },
+      liquidado: {
+        quantidade: soma.liquidado.quantidade + d.liquidado.quantidade,
+        valor: soma.liquidado.valor + d.liquidado.valor,
+      },
+      baixado: {
+        quantidade: soma.baixado.quantidade + d.baixado.quantidade,
+        valor: soma.baixado.valor + d.baixado.valor,
+      },
+      faltaBaixar: {
+        quantidade: soma.faltaBaixar.quantidade + d.faltaBaixar.quantidade,
+        valor: soma.faltaBaixar.valor + d.faltaBaixar.valor,
+      },
+    }),
+    {
+      total: 0,
+      aberto: { quantidade: 0, valor: 0 },
+      liquidado: { quantidade: 0, valor: 0 },
+      baixado: { quantidade: 0, valor: 0 },
+      faltaBaixar: { quantidade: 0, valor: 0 },
+    }
+  )
+}
+
+// Renderiza tanto a linha "Todas" quanto cada linha de factoring com a
+// mesma estrutura/estilo, só variando o destaque (fundo + rótulo em
+// negrito na de "Todas").
+function renderLinhaFactoring(nome, dados, destaque, key) {
+  return (
+    <div
+      key={key || nome}
+      className={`dashboard-factoring-linha${destaque ? ' dashboard-factoring-todas' : ''}`}
+    >
+      <span className="dashboard-factoring-nome">{nome}</span>
+      <span>{dados.total}</span>
+      <span style={{ color: COR_ABERTO }}>
+        {dados.aberto.quantidade}
+        <small>{formatarMoedaCompacta(dados.aberto.valor)}</small>
+      </span>
+      <span style={{ color: COR_LIQUIDADO }}>
+        {dados.liquidado.quantidade}
+        <small>{formatarMoedaCompacta(dados.liquidado.valor)}</small>
+      </span>
+      <span style={{ color: COR_BAIXADO }}>
+        {dados.baixado.quantidade}
+        <small>{formatarMoedaCompacta(dados.baixado.valor)}</small>
+      </span>
+      <span style={{ color: COR_FALTA_BAIXAR }}>
+        {dados.faltaBaixar.quantidade}
+        <small>{formatarMoedaCompacta(dados.faltaBaixar.valor)}</small>
+      </span>
+    </div>
+  )
+}
+
 export default function DashboardChart() {
   const [porStatus, setPorStatus] = useState({})
   const [valorPorStatus, setValorPorStatus] = useState({})
@@ -206,28 +277,10 @@ export default function DashboardChart() {
               <span>Baixado</span>
               <span>Falta baixar</span>
             </div>
-            {Object.entries(porFactoring).map(([chave, dados]) => (
-              <div key={chave} className="dashboard-factoring-linha">
-                <span className="dashboard-factoring-nome">{FACTORING_LABEL[chave] || chave}</span>
-                <span>{dados.total}</span>
-                <span>
-                  {dados.aberto.quantidade}
-                  <small>{formatarMoedaCompacta(dados.aberto.valor)}</small>
-                </span>
-                <span>
-                  {dados.liquidado.quantidade}
-                  <small>{formatarMoedaCompacta(dados.liquidado.valor)}</small>
-                </span>
-                <span>
-                  {dados.baixado.quantidade}
-                  <small>{formatarMoedaCompacta(dados.baixado.valor)}</small>
-                </span>
-                <span>
-                  {dados.faltaBaixar.quantidade}
-                  <small>{formatarMoedaCompacta(dados.faltaBaixar.valor)}</small>
-                </span>
-              </div>
-            ))}
+            {renderLinhaFactoring('Todas', somarFactoring(Object.values(porFactoring)), true)}
+            {Object.entries(porFactoring).map(([chave, dados]) =>
+              renderLinhaFactoring(FACTORING_LABEL[chave] || chave, dados, false, chave)
+            )}
           </div>
         </div>
       )}
