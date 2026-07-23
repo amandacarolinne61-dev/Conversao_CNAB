@@ -47,6 +47,13 @@ function derivarTitulo(t) {
   return { ultimoMov, valorTitulo, valorPago, diferenca }
 }
 
+// "Gerar remessa" (reenvio) vale pra liquidado e baixado - os únicos status
+// com linha_bruta_detalhe já gerada e sentido de reenvio ao portador (ver
+// mesma regra reforçada em pages/api/gerar-remessa.js).
+function elegivelRemessa(t) {
+  return t.status === 'liquidado' || t.status === 'baixado'
+}
+
 const STATUS_LABEL = {
   aguardando_retorno: { texto: 'Aguardando retorno', bg: 'var(--cor-neutro-bg)', tx: 'var(--cor-neutro-tx)' },
   liquidado: { texto: 'Liquidado', bg: 'var(--cor-verde-bg)', tx: 'var(--cor-verde-tx)' },
@@ -180,14 +187,14 @@ export default function Home() {
   }
 
   function toggleSelecionarTodos() {
-    // "Gerar remessa" só vale pra títulos liquidados - só esses entram no
-    // "selecionar todos" (os demais nem têm checkbox marcável na linha).
-    // Considera só o que está visível no filtro atual.
-    const liquidados = titulosFiltrados.filter((t) => t.status === 'liquidado')
+    // "Gerar remessa" só vale pra títulos liquidados/baixados - só esses
+    // entram no "selecionar todos" (os demais nem têm checkbox marcável na
+    // linha). Considera só o que está visível no filtro atual.
+    const elegiveis = titulosFiltrados.filter(elegivelRemessa)
     setSelecionados((atual) =>
-      liquidados.length > 0 && atual.size === liquidados.length
+      elegiveis.length > 0 && atual.size === elegiveis.length
         ? new Set()
-        : new Set(liquidados.map((t) => t.id))
+        : new Set(elegiveis.map((t) => t.id))
     )
   }
 
@@ -408,12 +415,12 @@ export default function Home() {
                 <input
                   type="checkbox"
                   checked={
-                    titulosFiltrados.some((t) => t.status === 'liquidado') &&
-                    titulosFiltrados.filter((t) => t.status === 'liquidado').every((t) => selecionados.has(t.id))
+                    titulosFiltrados.some(elegivelRemessa) &&
+                    titulosFiltrados.filter(elegivelRemessa).every((t) => selecionados.has(t.id))
                   }
                   onChange={toggleSelecionarTodos}
-                  disabled={!titulosFiltrados.some((t) => t.status === 'liquidado')}
-                  title="Selecionar todos os títulos liquidados (visíveis no filtro atual)"
+                  disabled={!titulosFiltrados.some(elegivelRemessa)}
+                  title="Selecionar todos os títulos liquidados/baixados (visíveis no filtro atual)"
                 />
               </th>
               <th>Nosso Número</th>
@@ -529,8 +536,8 @@ export default function Home() {
                       type="checkbox"
                       checked={selecionados.has(t.id)}
                       onChange={() => toggleSelecionado(t.id)}
-                      disabled={t.status !== 'liquidado'}
-                      title={t.status !== 'liquidado' ? 'Só títulos liquidados podem ser incluídos numa remessa' : undefined}
+                      disabled={!elegivelRemessa(t)}
+                      title={!elegivelRemessa(t) ? 'Só títulos liquidados ou baixados podem ser incluídos numa remessa' : undefined}
                     />
                   </td>
                   <td>{t.nosso_numero}</td>
