@@ -226,14 +226,17 @@ table {
   font-size: 0.87rem;
 }
 
-/* Larguras fixas por coluna (checkbox fica de fora - tem width própria
-   fixa em td:first-child - o resto soma 100%). Sem isso, colunas com
-   texto comprido esticavam a tabela pra além do container em vez de
-   quebrar linha, cortando as últimas colunas da vista. */
+/* Larguras fixas por coluna (soma 100%, checkbox incluído). Sem a largura
+   do checkbox aqui, table-layout:fixed usa só as células do cabeçalho pra
+   calcular as colunas - como as outras 10 já somavam 100%, a coluna do
+   checkbox (que só tinha width em td:first-child, não em th) ficava
+   espremida a quase 0px, mesmo a caixinha continuando "visível" por baixo,
+   fora do lugar. */
+th:nth-child(1), td:nth-child(1) { width: 3%; }
 th:nth-child(2), td:nth-child(2) { width: 8%; }
 th:nth-child(3), td:nth-child(3) { width: 9%; }
 th:nth-child(4), td:nth-child(4) { width: 11%; }
-th:nth-child(5), td:nth-child(5) { width: 15%; }
+th:nth-child(5), td:nth-child(5) { width: 12%; }
 th:nth-child(6), td:nth-child(6) { width: 9%; }
 th:nth-child(7), td:nth-child(7) { width: 8%; }
 th:nth-child(8), td:nth-child(8) { width: 8%; }
