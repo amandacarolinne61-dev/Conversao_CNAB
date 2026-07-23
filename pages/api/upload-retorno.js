@@ -41,10 +41,17 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { conteudo, nomeArquivo } = req.body
+    const { conteudo, nomeArquivo, factoring } = req.body
     if (!conteudo) {
       return res.status(400).json({ error: 'Conteúdo do arquivo não informado' })
     }
+
+    // Esse endpoint atende qualquer factoring que use o layout CNAB 400
+    // padrão (confirmado que a Apollo usa exatamente o mesmo layout da
+    // Bancorp, byte a byte, contra um arquivo real - só muda o nome/código
+    // do portador no próprio header do arquivo). 'bancorp' é o padrão pra
+    // manter compatibilidade com chamadas antigas sem esse campo.
+    const factoringAlvo = factoring || 'bancorp'
 
     const { cabecalho, movimentos, linhasIgnoradas } = parseRetorno(conteudo)
 
@@ -52,29 +59,31 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Nenhum movimento encontrado no arquivo' })
     }
 
-    // --- Busca só remessas da Bancorp - cada remessa só concilia com o
-    // retorno da MESMA factoring (títulos de remessa sem `factoring`
+    // --- Busca só remessas da factoring alvo - cada remessa só concilia
+    // com o retorno da MESMA factoring (títulos de remessa sem `factoring`
     // gravado, de antes dessa coluna existir, contam como Bancorp - era a
-    // única opção até então). Fetch separado em vez de join/nested select,
-    // seguindo o mesmo cuidado já usado pro índice de títulos abaixo. ---
-    const { data: remessasBancorp, error: erroRemessas } = await supabase
-      .from('remessas')
-      .select('id')
-      .or('factoring.eq.bancorp,factoring.is.null')
+    // única opção até então, então só entram nesse fallback quando o alvo é
+    // 'bancorp'). Fetch separado em vez de join/nested select, seguindo o
+    // mesmo cuidado já usado pro índice de títulos abaixo. ---
+    const query = supabase.from('remessas').select('id')
+    const { data: remessasAlvo, error: erroRemessas } =
+      factoringAlvo === 'bancorp'
+        ? await query.or('factoring.eq.bancorp,factoring.is.null')
+        : await query.eq('factoring', factoringAlvo)
 
     if (erroRemessas) throw erroRemessas
 
-    const remessaIdsBancorp = (remessasBancorp || []).map((r) => r.id)
+    const remessaIdsAlvo = (remessasAlvo || []).map((r) => r.id)
 
-    // --- Busca todos os títulos (só das remessas da Bancorp) e agrupa por
-    // número do título ---
+    // --- Busca todos os títulos (só das remessas da factoring alvo) e
+    // agrupa por número do título ---
     // Guarda TODOS os candidatos por chave (não só o mais recente) - se
     // mais de um título tiver o mesmo número, isso vira ambiguidade
     // detectável abaixo, em vez de escolher um silenciosamente.
     const { data: todosTitulos, error: erroTitulos } = await supabase
       .from('titulos')
       .select('id, remessa_id, nosso_numero, seu_numero, status, criado_em')
-      .in('remessa_id', remessaIdsBancorp)
+      .in('remessa_id', remessaIdsAlvo)
 
     if (erroTitulos) throw erroTitulos
 

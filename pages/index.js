@@ -141,7 +141,7 @@ export default function Home() {
       const resp = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conteudo, nomeArquivo: file.name }),
+        body: JSON.stringify({ conteudo, nomeArquivo: file.name, factoring: factoringRetorno }),
       })
       const data = await resp.json()
       if (!resp.ok) throw new Error(data.error)
@@ -313,6 +313,7 @@ export default function Home() {
             disabled={carregando}
           >
             <option value="bancorp">Bancorp (CNAB 400)</option>
+            <option value="apollo">Apollo (CNAB 400)</option>
             <option value="titan">Titan (CSV)</option>
           </select>
           <input type="file" onChange={handleUploadRetorno} disabled={carregando} />
