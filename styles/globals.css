@@ -346,6 +346,46 @@ input[type='checkbox']:disabled {
   background: #e2ddff;
 }
 
+/* --- Paginação da tabela de títulos --- */
+.paginacao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 4px 4px;
+}
+
+.paginacao-info {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.paginacao-botoes {
+  display: flex;
+  gap: 8px;
+}
+
+.paginacao-botoes button {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 7px 14px;
+  border-radius: 8px;
+}
+
+.paginacao-botoes button:hover:not(:disabled) {
+  background: var(--brand-soft);
+  border-color: #dcd8ff;
+}
+
+.paginacao-botoes button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* --- Linha de filtro por coluna --- */
 .linha-filtros th {
   padding: 6px 6px 10px;

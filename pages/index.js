@@ -104,9 +104,12 @@ export default function Home() {
     ultimaOcorrencia: '',
   }
   const [filtros, setFiltros] = useState(FILTROS_VAZIOS)
+  const TAMANHO_PAGINA = 50
+  const [pagina, setPagina] = useState(1)
 
   function atualizarFiltro(campo, valor) {
     setFiltros((atual) => ({ ...atual, [campo]: valor }))
+    setPagina(1)
   }
 
   const temFiltroAtivo = Object.values(filtros).some(Boolean)
@@ -137,6 +140,17 @@ export default function Home() {
       contem(filtros.ultimaOcorrencia, ultimoMov ? ultimoMov.ocorrencia_descricao : '')
     )
   })
+
+  // Paginação aplicada DEPOIS do filtro, sobre o conjunto já filtrado (não
+  // sobre `titulos` bruto) - evita repetir o bug de "filtro não acha nada"
+  // que existia com o limit(200) fixo da API (títulos fora da janela nem
+  // chegavam a ser considerados pelo filtro).
+  const totalPaginas = Math.max(1, Math.ceil(titulosFiltrados.length / TAMANHO_PAGINA))
+  const paginaAtual = Math.min(pagina, totalPaginas)
+  const titulosPagina = titulosFiltrados.slice(
+    (paginaAtual - 1) * TAMANHO_PAGINA,
+    paginaAtual * TAMANHO_PAGINA
+  )
 
   const carregarTitulos = useCallback(async () => {
     const resp = await fetch('/api/titulos')
@@ -403,7 +417,13 @@ export default function Home() {
         <div className="titulos-header">
           <h2>Títulos</h2>
           {temFiltroAtivo && (
-            <button className="btn-limpar-busca" onClick={() => setFiltros(FILTROS_VAZIOS)}>
+            <button
+              className="btn-limpar-busca"
+              onClick={() => {
+                setFiltros(FILTROS_VAZIOS)
+                setPagina(1)
+              }}
+            >
               × Limpar filtros ({titulosFiltrados.length} de {titulos.length})
             </button>
           )}
@@ -444,7 +464,7 @@ export default function Home() {
                   }
                   onChange={toggleSelecionarTodos}
                   disabled={!titulosFiltrados.some(elegivelGerarBaixa)}
-                  title="Selecionar todos os títulos liquidados/baixados (visíveis no filtro atual)"
+                  title="Selecionar todos os títulos liquidados/baixados do filtro atual (todas as páginas)"
                 />
               </th>
               <th>Nosso Número</th>
@@ -546,7 +566,7 @@ export default function Home() {
             </tr>
           </thead>
           <tbody>
-            {titulosFiltrados.map((t) => {
+            {titulosPagina.map((t) => {
               const status = estaVencido(t, hojeISO)
                 ? STATUS_VENCIDO
                 : STATUS_LABEL[t.status] || {
@@ -598,6 +618,27 @@ export default function Home() {
           </tbody>
         </table>
         </div>
+        {titulosFiltrados.length > 0 && (
+          <div className="paginacao">
+            <span className="paginacao-info">
+              {titulosFiltrados.length} título(s) - página {paginaAtual} de {totalPaginas}
+            </span>
+            <div className="paginacao-botoes">
+              <button
+                onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                disabled={paginaAtual === 1}
+              >
+                ← Anterior
+              </button>
+              <button
+                onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                disabled={paginaAtual === totalPaginas}
+              >
+                Próxima →
+              </button>
+            </div>
+          </div>
+        )}
       </section>
     </div>
   )
