@@ -53,7 +53,6 @@ export default async function handler(req, res) {
       total: 0,
       aberto: { quantidade: 0, valor: 0 },
       liquidado: { quantidade: 0, valor: 0 },
-      baixado: { quantidade: 0, valor: 0 },
       faltaBaixar: { quantidade: 0, valor: 0 },
     })
 
@@ -76,10 +75,6 @@ export default async function handler(req, res) {
           grupo.faltaBaixar.quantidade++
           grupo.faltaBaixar.valor += valor
         }
-      }
-      if (t.status === 'baixado') {
-        grupo.baixado.quantidade++
-        grupo.baixado.valor += valor
       }
     }
 

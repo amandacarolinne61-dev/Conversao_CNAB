@@ -31,7 +31,6 @@ const FACTORING_LABEL = {
 const COR_NEUTRO = '#6b7280'
 const COR_ABERTO = '#2563eb'
 const COR_LIQUIDADO = '#15803d'
-const COR_BAIXADO = '#d97706'
 const COR_FALTA_BAIXAR = '#dc2626'
 
 // Colunas de status do painel "Por factoring" - cor de cada uma é usada
@@ -40,8 +39,7 @@ const COR_FALTA_BAIXAR = '#dc2626'
 const COLUNAS_STATUS = [
   { chave: 'aberto', rotulo: 'Em aberto', cor: COR_ABERTO, col: 3 },
   { chave: 'liquidado', rotulo: 'Liquidado', cor: COR_LIQUIDADO, col: 4 },
-  { chave: 'baixado', rotulo: 'Baixado', cor: COR_BAIXADO, col: 5 },
-  { chave: 'faltaBaixar', rotulo: 'Falta baixar', cor: COR_FALTA_BAIXAR, col: 6 },
+  { chave: 'faltaBaixar', rotulo: 'Falta baixar', cor: COR_FALTA_BAIXAR, col: 5 },
 ]
 
 function somarFactoring(lista) {
@@ -56,10 +54,6 @@ function somarFactoring(lista) {
         quantidade: soma.liquidado.quantidade + d.liquidado.quantidade,
         valor: soma.liquidado.valor + d.liquidado.valor,
       },
-      baixado: {
-        quantidade: soma.baixado.quantidade + d.baixado.quantidade,
-        valor: soma.baixado.valor + d.baixado.valor,
-      },
       faltaBaixar: {
         quantidade: soma.faltaBaixar.quantidade + d.faltaBaixar.quantidade,
         valor: soma.faltaBaixar.valor + d.faltaBaixar.valor,
@@ -69,7 +63,6 @@ function somarFactoring(lista) {
       total: 0,
       aberto: { quantidade: 0, valor: 0 },
       liquidado: { quantidade: 0, valor: 0 },
-      baixado: { quantidade: 0, valor: 0 },
       faltaBaixar: { quantidade: 0, valor: 0 },
     }
   )

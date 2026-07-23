@@ -558,7 +558,7 @@ input[type='checkbox']:disabled {
 
 .dashboard-factoring-tabela {
   display: grid;
-  grid-template-columns: minmax(120px, 1.3fr) 70px repeat(4, minmax(112px, 1fr));
+  grid-template-columns: minmax(120px, 1.3fr) 70px repeat(3, minmax(112px, 1fr));
   column-gap: 6px;
   row-gap: 4px;
 }
@@ -632,7 +632,7 @@ input[type='checkbox']:disabled {
 
 @media (max-width: 780px) {
   .dashboard-factoring-tabela {
-    grid-template-columns: minmax(90px, 1fr) 56px repeat(4, minmax(92px, 1fr));
+    grid-template-columns: minmax(90px, 1fr) 56px repeat(3, minmax(92px, 1fr));
     font-size: 0.78rem;
     overflow-x: auto;
   }
