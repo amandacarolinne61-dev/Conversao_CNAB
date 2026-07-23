@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { conteudo, nomeArquivo, portadorCodigo, portadorNome } = req.body
+    const { conteudo, nomeArquivo, portadorCodigo, portadorNome, factoring } = req.body
     if (!conteudo) {
       return res.status(400).json({ error: 'Conteúdo do arquivo não informado' })
     }
@@ -69,6 +69,11 @@ export default async function handler(req, res) {
         nome_arquivo: nomeArquivo || null,
         header_bruto: cabecalho.headerBruto,
         trailer_bruto: cabecalho.trailerBruto,
+        // Qual factoring vai processar o retorno dessa remessa - restringe
+        // o casamento em upload-retorno.js/upload-retorno-titan.js pra só
+        // considerar títulos da mesma factoring (ver comentário em
+        // schema.sql sobre `remessas.factoring`).
+        factoring: factoring === 'titan' ? 'titan' : 'bancorp',
       })
       .select()
       .single()

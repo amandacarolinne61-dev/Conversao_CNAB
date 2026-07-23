@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     // server-side o tempo todo (ver lib/supabaseClient.js).
     const { data: titulosValores, error: erroValores } = await supabase
       .from('titulos')
-      .select('status, valor_titulo')
+      .select('status, valor_titulo, remessa_id, exportado_em')
 
     if (erroValores) throw erroValores
 
@@ -32,9 +32,61 @@ export default async function handler(req, res) {
       valorPorStatus[t.status] = (valorPorStatus[t.status] || 0) + Number(t.valor_titulo || 0)
     }
 
+    // --- Painel por factoring: cada remessa só concilia com o retorno da
+    // mesma factoring (ver comentário em schema.sql sobre
+    // `remessas.factoring`), então faz sentido acompanhar separadamente o
+    // que cada uma tem aberto/liquidado/baixado. Fetch separado de
+    // `remessas` + join em JS, mesmo cuidado já usado no casamento de
+    // retorno (não nested select). ---
+    const { data: remessas, error: erroRemessasFactoring } = await supabase
+      .from('remessas')
+      .select('id, factoring, portador_nome')
+
+    if (erroRemessasFactoring) throw erroRemessasFactoring
+
+    const factoringPorRemessa = new Map(
+      (remessas || []).map((r) => [r.id, r.factoring || 'bancorp'])
+    )
+
+    const ABERTO = new Set(['aguardando_retorno', 'confirmado', 'ver_manual'])
+    const vazioFactoring = () => ({
+      total: 0,
+      aberto: { quantidade: 0, valor: 0 },
+      liquidado: { quantidade: 0, valor: 0 },
+      baixado: { quantidade: 0, valor: 0 },
+      faltaBaixar: { quantidade: 0, valor: 0 },
+    })
+
+    const porFactoring = {}
+    for (const t of titulosValores || []) {
+      const factoring = factoringPorRemessa.get(t.remessa_id) || 'bancorp'
+      if (!porFactoring[factoring]) porFactoring[factoring] = vazioFactoring()
+      const grupo = porFactoring[factoring]
+      const valor = Number(t.valor_titulo || 0)
+
+      grupo.total++
+      if (ABERTO.has(t.status)) {
+        grupo.aberto.quantidade++
+        grupo.aberto.valor += valor
+      }
+      if (t.status === 'liquidado') {
+        grupo.liquidado.quantidade++
+        grupo.liquidado.valor += valor
+        if (!t.exportado_em) {
+          grupo.faltaBaixar.quantidade++
+          grupo.faltaBaixar.valor += valor
+        }
+      }
+      if (t.status === 'baixado') {
+        grupo.baixado.quantidade++
+        grupo.baixado.valor += valor
+      }
+    }
+
     return res.status(200).json({
       porStatus,
       valorPorStatus,
+      porFactoring,
       total,
       atualizadoEm: new Date().toISOString(),
     })

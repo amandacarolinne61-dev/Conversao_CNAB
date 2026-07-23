@@ -52,13 +52,29 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Nenhum movimento encontrado no arquivo' })
     }
 
-    // --- Busca todos os títulos e agrupa por número do título ---
+    // --- Busca só remessas da Bancorp - cada remessa só concilia com o
+    // retorno da MESMA factoring (títulos de remessa sem `factoring`
+    // gravado, de antes dessa coluna existir, contam como Bancorp - era a
+    // única opção até então). Fetch separado em vez de join/nested select,
+    // seguindo o mesmo cuidado já usado pro índice de títulos abaixo. ---
+    const { data: remessasBancorp, error: erroRemessas } = await supabase
+      .from('remessas')
+      .select('id')
+      .or('factoring.eq.bancorp,factoring.is.null')
+
+    if (erroRemessas) throw erroRemessas
+
+    const remessaIdsBancorp = (remessasBancorp || []).map((r) => r.id)
+
+    // --- Busca todos os títulos (só das remessas da Bancorp) e agrupa por
+    // número do título ---
     // Guarda TODOS os candidatos por chave (não só o mais recente) - se
     // mais de um título tiver o mesmo número, isso vira ambiguidade
     // detectável abaixo, em vez de escolher um silenciosamente.
     const { data: todosTitulos, error: erroTitulos } = await supabase
       .from('titulos')
       .select('id, remessa_id, nosso_numero, seu_numero, status, criado_em')
+      .in('remessa_id', remessaIdsBancorp)
 
     if (erroTitulos) throw erroTitulos
 

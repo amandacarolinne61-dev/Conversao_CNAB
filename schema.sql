@@ -20,6 +20,14 @@ create table if not exists remessas (
   -- posição que esse projeto nunca validou byte a byte.
   header_bruto text,
   trailer_bruto text,
+  -- Qual factoring vai processar o retorno dessa remessa ('bancorp' ou
+  -- 'titan') - escolhido na tela no momento do envio, igual ao seletor que
+  -- já existe no envio de retorno. Cada remessa só concilia com o retorno
+  -- da MESMA factoring: upload-retorno.js e upload-retorno-titan.js usam
+  -- esse campo pra restringir contra quais títulos o casamento é tentado,
+  -- evitando colar liquidação num título de outra factoring por coincidência
+  -- de número/nome.
+  factoring text,
   criado_em timestamptz default now()
 );
 

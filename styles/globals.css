@@ -252,6 +252,12 @@ input[type='checkbox']:disabled {
   margin: 0;
 }
 
+.titulos-header-acoes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .btn-gerar-remessa {
   background: linear-gradient(135deg, var(--brand), var(--brand-dark));
   color: white;
@@ -283,12 +289,6 @@ input[type='checkbox']:disabled {
   font-size: 0.74rem;
   font-weight: 600;
   white-space: nowrap;
-}
-
-.tabela-rodape {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 14px;
 }
 
 .btn-exportar-excel {
@@ -479,4 +479,76 @@ input[type='checkbox']:disabled {
   .dashboard-hero { flex-direction: column; align-items: flex-start; gap: 14px; }
   .dashboard-hero-divisor { display: none; }
   .dashboard-tiles { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+}
+
+/* --- Painel por factoring --- */
+.dashboard-factoring {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.dashboard-factoring h3 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 12px;
+}
+
+.dashboard-factoring-tabela {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dashboard-factoring-linha {
+  display: grid;
+  grid-template-columns: 110px repeat(5, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.dashboard-factoring-linha:not(.dashboard-factoring-cabecalho):hover {
+  background: #f8f8ff;
+}
+
+.dashboard-factoring-cabecalho {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dashboard-factoring-nome {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.dashboard-factoring-linha span {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+}
+
+.dashboard-factoring-linha small {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+@media (max-width: 780px) {
+  .dashboard-factoring-linha {
+    grid-template-columns: 90px repeat(5, minmax(70px, 1fr));
+    font-size: 0.78rem;
+    overflow-x: auto;
+  }
 }

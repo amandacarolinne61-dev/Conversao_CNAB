@@ -71,9 +71,15 @@ function formatarMoedaCompacta(v) {
   return formatarMoeda(n)
 }
 
+const FACTORING_LABEL = {
+  bancorp: 'Bancorp',
+  titan: 'Titan',
+}
+
 export default function DashboardChart() {
   const [porStatus, setPorStatus] = useState({})
   const [valorPorStatus, setValorPorStatus] = useState({})
+  const [porFactoring, setPorFactoring] = useState({})
   const [total, setTotal] = useState(0)
   const [modoTempoReal, setModoTempoReal] = useState(null) // 'realtime' | 'polling'
   const pollingRef = useRef(null)
@@ -85,6 +91,7 @@ export default function DashboardChart() {
       if (resp.ok) {
         setPorStatus(data.porStatus || {})
         setValorPorStatus(data.valorPorStatus || {})
+        setPorFactoring(data.porFactoring || {})
         setTotal(data.total || 0)
       }
     } catch {
@@ -196,6 +203,44 @@ export default function DashboardChart() {
           )
         })}
       </div>
+
+      {Object.keys(porFactoring).length > 0 && (
+        <div className="dashboard-factoring">
+          <h3>Por factoring</h3>
+          <div className="dashboard-factoring-tabela">
+            <div className="dashboard-factoring-linha dashboard-factoring-cabecalho">
+              <span>Factoring</span>
+              <span>Total</span>
+              <span>Em aberto</span>
+              <span>Liquidado</span>
+              <span>Baixado</span>
+              <span>Falta baixar</span>
+            </div>
+            {Object.entries(porFactoring).map(([chave, dados]) => (
+              <div key={chave} className="dashboard-factoring-linha">
+                <span className="dashboard-factoring-nome">{FACTORING_LABEL[chave] || chave}</span>
+                <span>{dados.total}</span>
+                <span>
+                  {dados.aberto.quantidade}
+                  <small>{formatarMoedaCompacta(dados.aberto.valor)}</small>
+                </span>
+                <span>
+                  {dados.liquidado.quantidade}
+                  <small>{formatarMoedaCompacta(dados.liquidado.valor)}</small>
+                </span>
+                <span>
+                  {dados.baixado.quantidade}
+                  <small>{formatarMoedaCompacta(dados.baixado.valor)}</small>
+                </span>
+                <span>
+                  {dados.faltaBaixar.quantidade}
+                  <small>{formatarMoedaCompacta(dados.faltaBaixar.valor)}</small>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   )
 }

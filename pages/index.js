@@ -30,7 +30,8 @@ export default function Home() {
   const [carregando, setCarregando] = useState(false)
   const [mensagem, setMensagem] = useState(null)
   const [selecionados, setSelecionados] = useState(() => new Set())
-  const [factoring, setFactoring] = useState('bancorp')
+  const [factoringRemessa, setFactoringRemessa] = useState('bancorp')
+  const [factoringRetorno, setFactoringRetorno] = useState('bancorp')
 
   const carregarTitulos = useCallback(async () => {
     const resp = await fetch('/api/titulos')
@@ -52,7 +53,7 @@ export default function Home() {
       const resp = await fetch('/api/upload-remessa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conteudo, nomeArquivo: file.name }),
+        body: JSON.stringify({ conteudo, nomeArquivo: file.name, factoring: factoringRemessa }),
       })
       const data = await resp.json()
       if (!resp.ok) throw new Error(data.error)
@@ -76,7 +77,7 @@ export default function Home() {
     setMensagem(null)
     try {
       const conteudo = await lerArquivoComoLatin1(file)
-      const endpoint = factoring === 'titan' ? '/api/upload-retorno-titan' : '/api/upload-retorno'
+      const endpoint = factoringRetorno === 'titan' ? '/api/upload-retorno-titan' : '/api/upload-retorno'
       const resp = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -206,7 +207,7 @@ export default function Home() {
       </header>
 
       <section className="cards">
-        <label className="card upload-card">
+        <div className="card upload-card">
           <span className="card-icone">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path
@@ -220,8 +221,17 @@ export default function Home() {
           </span>
           <span className="card-titulo">Enviar remessa</span>
           <span className="card-desc">Arquivo gerado antes do envio ao banco/portador</span>
+          <select
+            className="select-factoring"
+            value={factoringRemessa}
+            onChange={(e) => setFactoringRemessa(e.target.value)}
+            disabled={carregando}
+          >
+            <option value="bancorp">Bancorp (CNAB 400)</option>
+            <option value="titan">Titan (CSV)</option>
+          </select>
           <input type="file" onChange={handleUploadRemessa} disabled={carregando} />
-        </label>
+        </div>
 
         <div className="card upload-card">
           <span className="card-icone">
@@ -239,8 +249,8 @@ export default function Home() {
           <span className="card-desc">Arquivo recebido da factoring</span>
           <select
             className="select-factoring"
-            value={factoring}
-            onChange={(e) => setFactoring(e.target.value)}
+            value={factoringRetorno}
+            onChange={(e) => setFactoringRetorno(e.target.value)}
             disabled={carregando}
           >
             <option value="bancorp">Bancorp (CNAB 400)</option>
@@ -274,11 +284,29 @@ export default function Home() {
       <section>
         <div className="titulos-header">
           <h2>Títulos</h2>
-          {selecionados.size > 0 && (
-            <button className="btn-gerar-remessa" onClick={gerarRemessaSelecionados}>
-              Gerar remessa ({selecionados.size} selecionado{selecionados.size > 1 ? 's' : ''})
+          <div className="titulos-header-acoes">
+            {selecionados.size > 0 && (
+              <button className="btn-gerar-remessa" onClick={gerarRemessaSelecionados}>
+                Gerar remessa ({selecionados.size} selecionado{selecionados.size > 1 ? 's' : ''})
+              </button>
+            )}
+            <button
+              className="btn-exportar-excel"
+              onClick={exportarExcel}
+              disabled={titulos.length === 0}
+            >
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Exportar Excel (.csv)
             </button>
-          )}
+          </div>
         </div>
         <table>
           <thead>
@@ -362,25 +390,6 @@ export default function Home() {
             )}
           </tbody>
         </table>
-
-        <div className="tabela-rodape">
-          <button
-            className="btn-exportar-excel"
-            onClick={exportarExcel}
-            disabled={titulos.length === 0}
-          >
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Exportar Excel (.csv)
-          </button>
-        </div>
       </section>
     </div>
   )

@@ -43,10 +43,26 @@ export default async function handler(req, res) {
       })
     }
 
-    // --- Busca todos os títulos e agrupa por numero_titulo + nome_sacado ---
+    // --- Busca só remessas da Titan - cada remessa só concilia com o
+    // retorno da MESMA factoring (ver comentário equivalente em
+    // upload-retorno.js). Diferente do Bancorp, aqui não há fallback pra
+    // `factoring IS NULL` - a Titan é nova, nenhum título legado pertence a
+    // ela por omissão. ---
+    const { data: remessasTitan, error: erroRemessas } = await supabase
+      .from('remessas')
+      .select('id')
+      .eq('factoring', 'titan')
+
+    if (erroRemessas) throw erroRemessas
+
+    const remessaIdsTitan = (remessasTitan || []).map((r) => r.id)
+
+    // --- Busca todos os títulos (só das remessas da Titan) e agrupa por
+    // numero_titulo + nome_sacado ---
     const { data: todosTitulos, error: erroTitulos } = await supabase
       .from('titulos')
       .select('id, remessa_id, nosso_numero, numero_titulo, nome_sacado, cnpj_sacado, status, criado_em')
+      .in('remessa_id', remessaIdsTitan)
 
     if (erroTitulos) throw erroTitulos
 
