@@ -508,9 +508,10 @@ input[type='checkbox']:disabled {
 .dashboard-hero {
   display: flex;
   align-items: center;
-  gap: 28px;
-  margin: 18px 0 24px;
-  padding: 18px 22px;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  margin: 16px 0 22px;
+  padding: 14px 18px;
   background: linear-gradient(135deg, var(--brand-soft), #f7f6ff);
   border: 1px solid #e2ddff;
   border-radius: 12px;
@@ -520,24 +521,26 @@ input[type='checkbox']:disabled {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  gap: 4px;
 }
 
 .dashboard-pill {
   display: inline-flex;
   align-items: baseline;
-  padding: 6px 16px;
+  padding: 5px 14px;
   border-radius: 999px;
-  font-size: 1.3rem;
+  font-size: 1.1rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   font-family: 'IBM Plex Mono', monospace;
+  white-space: nowrap;
 }
 
 .dashboard-hero-rotulo {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   color: var(--muted);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .dashboard-hero-divisor {
