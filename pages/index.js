@@ -282,9 +282,10 @@ export default function Home() {
             value={factoringRemessa}
             onChange={(e) => setFactoringRemessa(e.target.value)}
             disabled={carregando}
+            title="A remessa sempre segue o mesmo padrão CNAB 400 - isso só marca qual factoring vai processar o retorno desses títulos"
           >
-            <option value="bancorp">Bancorp (CNAB 400)</option>
-            <option value="titan">Titan (CSV)</option>
+            <option value="bancorp">Bancorp</option>
+            <option value="titan">Titan</option>
           </select>
           <input type="file" onChange={handleUploadRemessa} disabled={carregando} />
         </div>
