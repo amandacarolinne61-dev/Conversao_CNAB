@@ -113,6 +113,7 @@ function renderLinhaFactoring(rowIndex, nome, dados, destaque, key) {
 }
 
 export default function DashboardChart() {
+  const [porStatus, setPorStatus] = useState({})
   const [valorPorStatus, setValorPorStatus] = useState({})
   const [porFactoring, setPorFactoring] = useState({})
   const [aberto, setAberto] = useState({ quantidade: 0, valor: 0 })
@@ -126,6 +127,7 @@ export default function DashboardChart() {
       const resp = await fetch('/api/dashboard-status')
       const data = await resp.json()
       if (resp.ok) {
+        setPorStatus(data.porStatus || {})
         setValorPorStatus(data.valorPorStatus || {})
         setPorFactoring(data.porFactoring || {})
         setAberto(data.aberto || { quantidade: 0, valor: 0 })
@@ -164,6 +166,7 @@ export default function DashboardChart() {
   }, [])
 
   const valorTotal = Object.values(valorPorStatus).reduce((soma, v) => soma + v, 0)
+  const liquidado = { quantidade: porStatus.liquidado || 0, valor: valorPorStatus.liquidado || 0 }
 
   const factoringsOrdenados = Object.entries(porFactoring)
 
@@ -223,6 +226,16 @@ export default function DashboardChart() {
             {formatarMoeda(vencido.valor)}
           </span>
           <span className="dashboard-hero-rotulo">{vencido.quantidade} vencido(s)</span>
+        </div>
+        <div className="dashboard-hero-divisor" />
+        <div className="dashboard-hero-item">
+          <span
+            className="dashboard-pill"
+            style={{ background: hexParaRgba(COR_LIQUIDADO, 0.1), color: COR_LIQUIDADO }}
+          >
+            {formatarMoeda(liquidado.valor)}
+          </span>
+          <span className="dashboard-hero-rotulo">{liquidado.quantidade} liquidado(s)</span>
         </div>
       </div>
 
